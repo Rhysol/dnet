@@ -1,0 +1,41 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "cmake_debug",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["-DCMAKE_BUILD_TYPE=Debug", "."]
+        },
+        {
+            "label": "cmake_release",
+            "type": "shell",
+            "command": "cmake",
+            "args": ["-DCMAKE_BUILD_TYPE=Debug", "."]
+        },
+        {
+            "label": "make",
+            "type": "shell",
+            "command": "make",
+            "args": []
+        },
+        {
+            "label": "build_debug",
+            "dependsOn": ["cmake_debug", "make"]
+        },
+        {
+            "label": "build_release",
+            "dependsOn": ["cmake_release", "make"]
+        },
+        {
+            "label": "build_mpsc_test",
+            "type": "shell",
+            "command": "g++ -std=c++11 -g -lpthread mpsc_queue_test.cpp src/mpsc_queue.h"
+        },
+        {
+            "label": "build_client_test",
+            "type": "shell",
+            "command": "g++ -std=c++11 -g client_test.cpp src/connection_manager.cpp"
+        }
+    ]
+}
