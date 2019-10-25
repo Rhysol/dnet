@@ -26,7 +26,12 @@ public:
     uint32_t body_offset = 0;
 };
 
-//告诉底层如何创建NetPacket，由使用者自定义
-typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
-//告诉底层如果处理Netpacket, 由使用者自定义
-typedef std::function<void (const NetPacketInterface &)> HandlePacketFunc;
+//net_manager通知
+class NetHandlerInterface
+{
+public:
+    //告诉net_manager如何创建NetPacket，使用者自定义
+    virtual NetPacketInterface *CreateNetPacket() = 0;
+    virtual void HandlePacket(const NetPacketInterface &) = 0;
+    virtual void HandleDisconnect(int32_t connection_fd) = 0;
+};

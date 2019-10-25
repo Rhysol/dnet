@@ -18,16 +18,17 @@ NetManager::~NetManager()
 }
 
 bool NetManager::Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port,
-    const CreateNetPacketFunc &create_packet_func, const HandlePacketFunc &handle_packet_func)
+    NetHandlerInterface *net_hander)
 {
+    if (net_hander == nullptr) return false;
     m_io_threads_num = thread_num; 
+    m_net_handler = net_hander;
     m_events_queue.Init(m_io_threads_num),
-    m_io_event_pipe.Init(m_io_threads_num, std::bind(&NetManager::AcceptIOEvent, this,
-        std::placeholders::_1, std::placeholders::_2), create_packet_func);
-    m_handle_packet_func = handle_packet_func;
-
+    m_io_event_pipe.Init(m_io_threads_num, 
+        std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler));
     InitThreads(listen_ip, listen_port);
-
+    return true;
 }
 
 void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
@@ -80,6 +81,9 @@ uint32_t NetManager::Update()
         case IOEvent::EventType::READ:
             HandleReadEvent((ReadEvent &)(*event));
             break;
+        case IOEvent::EventType::DISCONNECTED:
+            HandleDisconnectEvent((DisconnectEvent &)(*event));
+            break;
         default:
             { std::cout << "unkown event type" << std::endl; }
             break;
@@ -103,7 +107,13 @@ void NetManager::HandleAcceptedConnectionEvent(const AcceptedConnectionEvent &ev
 
 void NetManager::HandleReadEvent(const ReadEvent &event)
 {
-    //m_handle_packet_func(*event.packet);
+    //m_net_handler->HandlePacket(*event.packet);
+}
+
+void NetManager::HandleDisconnectEvent(const DisconnectEvent &event)
+{
+    m_connection_manager.DisconnectFrom(event.connection_fd);
+    // m_net_handler->HandleDisconnect(event.connection_fd);
 }
 
 const Connection *NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)

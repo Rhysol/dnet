@@ -14,8 +14,9 @@ void WaitAWhile()
 	nanosleep(&t, NULL);
 }
 
-struct NetPacket : public NetPacketInterface
+class NetPacket : public NetPacketInterface
 {
+public:
 	NetPacket(uint32_t header_len) : NetPacketInterface(header_len)
 	{
 
@@ -25,15 +26,28 @@ struct NetPacket : public NetPacketInterface
 	}
 };
 
-NetPacketInterface *CreateNetPacket()
+class NetHandler : public NetHandlerInterface
 {
-	return new NetPacket(512);
-}
+public:
+    virtual NetPacketInterface *CreateNetPacket() override
+	{
+		return new NetPacket(512);
+	}
+    virtual void HandlePacket(const NetPacketInterface &) override
+	{
+
+	}
+    virtual void HandleDisconnect(int32_t connection_fd) override
+	{
+
+	}
+};
 
 int main(int argc, char *argv[])
 {
+	NetHandler handler;
 	NetManager net;
-	net.Init(std::atoi(argv[1]), "0.0.0.0", 18889, std::bind(&CreateNetPacket), nullptr);
+	net.Init(std::atoi(argv[1]), "0.0.0.0", 18889, &handler);
 	uint32_t handle_count = 0;
 	uint32_t handleed_count = 0;
 	auto start = std::chrono::system_clock::now();

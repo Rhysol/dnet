@@ -4,7 +4,7 @@
 #include <functional>
 #include <vector>
 #include <unordered_map>
-#include "net_packet_interface.h"
+#include "net_interface.h"
 
 struct IOEvent
 {
@@ -66,6 +66,7 @@ public:
     ~IOEventPipe();
 
     typedef std::function<void (IOEvent *event, uint16_t thread_id)> AcceptEventFunc;
+    typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
     bool Init(uint16_t thread_num, const AcceptEventFunc &accept_event_func, const CreateNetPacketFunc &create_packet_func);
 
     //在listener_thread中被调用

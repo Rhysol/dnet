@@ -66,3 +66,9 @@ const Connection *ConnectionManager::AddConnection(int32_t connection_fd, const 
     connection.remote_port = remote_port;
     return &connection;
 }
+
+void ConnectionManager::DisconnectFrom(int32_t fd)
+{
+    close(fd);
+    m_connections.erase(fd);
+}

@@ -3,7 +3,7 @@
 #include "connection_manager.h"
 #include "io_event_pipe.h"
 #include "mpsc_queue.h"
-#include "net_packet_interface.h"
+#include "net_interface.h"
 
 
 class IOThread;
@@ -16,8 +16,7 @@ public:
     NetManager();
     ~NetManager();
 
-    bool Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port,
-        const CreateNetPacketFunc &create_packet_func, const HandlePacketFunc &handle_packet_func);
+    bool Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port, NetHandlerInterface *net_handler);
     uint32_t Update();
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
@@ -29,8 +28,10 @@ private:
 
     uint16_t HashToIoThread(int32_t connection_fd);
     void AcceptIOEvent(IOEvent *event, uint16_t thread_id);
+
     void HandleAcceptedConnectionEvent(const AcceptedConnectionEvent &event);
     void HandleReadEvent(const ReadEvent &event);
+    void HandleDisconnectEvent(const DisconnectEvent &event);
 
 private:
     ListenerThread *m_listener_thread;
@@ -40,9 +41,12 @@ private:
     IOEventPipe m_io_event_pipe;
     MPSCQueue<IOEvent> m_events_queue;
 
-    HandlePacketFunc m_handle_packet_func;
+    // HandlePacketFunc m_handle_packet_func;
+    // HandleDisconnectFunc m_handle_disconnect_func;
 
     ConnectionManager m_connection_manager;
+
+    NetHandlerInterface *m_net_handler;
 
     bool m_keep_alive = true;
 };
