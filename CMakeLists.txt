@@ -10,4 +10,4 @@ set (CMAKE_CXX_STANDARD 11)
 
 add_executable(net_lib src/main.cpp src/listener.cpp src/connection_manager.cpp src/epoll_event_manager.cpp
 src/io_event_pipe.cpp src/io_thread.cpp src/listener_thread.cpp src/net_manager.cpp)
-target_link_libraries(net_lib pthread profiler)
+target_link_libraries(net_lib pthread profiler tcmalloc)

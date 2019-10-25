@@ -1,4 +1,6 @@
 ./a.out
+./log
+./log/*
 ./CMakeFiles
 ./CMakeFiles/*
 ./cmake_install.cmake

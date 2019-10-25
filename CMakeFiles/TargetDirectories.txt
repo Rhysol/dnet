@@ -1,3 +1,0 @@
-/root/net_lib/CMakeFiles/edit_cache.dir
-/root/net_lib/CMakeFiles/rebuild_cache.dir
-/root/net_lib/CMakeFiles/net_lib.dir
