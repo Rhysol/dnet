@@ -4,7 +4,7 @@
 
 void DoSend(const Connection &client)
 {
-    static int count = 200000;
+    static int count = 100000;
     if (count == 0) return;
 	char buff[2048] = "abc";
 	int write_num = write(client.fd, buff, 1024);
@@ -35,7 +35,7 @@ void WaitAWhile()
 {
 	timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = 100000;
+	t.tv_nsec = 10000;
 	nanosleep(&t, NULL);
 }
 
