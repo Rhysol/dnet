@@ -15,12 +15,13 @@ struct ReadBuffer
     uint32_t buffer_len = 0;
 };
 
-class EpollEventHandler
+class IOHandler
 {
 public:
-    EpollEventHandler();
-    ~EpollEventHandler();
+    IOHandler();
+    ~IOHandler();
 
+    typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
     typedef std::function<void (IOEvent *event)> OutputIOEventPipe;
     void Init(const CreateNetPacketFunc &create_packt_func, const OutputIOEventPipe &pipe);
 

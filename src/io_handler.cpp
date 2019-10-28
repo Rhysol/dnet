@@ -1,4 +1,4 @@
-#include "epoll_event_handler.h"
+#include "io_handler.h"
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -8,23 +8,23 @@
 #include <iostream>
 
 
-EpollEventHandler::EpollEventHandler()
+IOHandler::IOHandler()
 {
 
 }
 
-EpollEventHandler::~EpollEventHandler()
+IOHandler::~IOHandler()
 {
 
 }
 
-void EpollEventHandler::Init(const CreateNetPacketFunc &create_packt_func, const OutputIOEventPipe &pipe)
+void IOHandler::Init(const CreateNetPacketFunc &create_packt_func, const OutputIOEventPipe &pipe)
 {
     m_output_io_event_pipe = pipe;
     m_create_net_packet_func = create_packt_func;
 }
 
-void EpollEventHandler::HandleListenEvent(const epoll_event &ev, int32_t listener_fd)
+void IOHandler::HandleListenEvent(const epoll_event &ev, int32_t listener_fd)
 {
     if (ev.data.fd == listener_fd)
     {
@@ -36,7 +36,7 @@ void EpollEventHandler::HandleListenEvent(const epoll_event &ev, int32_t listene
     }
 }
 
-void EpollEventHandler::HandleIOEvent(const epoll_event &ev)
+void IOHandler::HandleIOEvent(const epoll_event &ev)
 {
     if (ev.events & EPOLLIN)
     {
@@ -44,7 +44,7 @@ void EpollEventHandler::HandleIOEvent(const epoll_event &ev)
     }
 }
 
-void EpollEventHandler::OnAccept(int32_t listener_fd)
+void IOHandler::OnAccept(int32_t listener_fd)
 {
     sockaddr_in client_addr;
     memset(&client_addr, 0, sizeof(sockaddr_in));
@@ -66,14 +66,14 @@ void EpollEventHandler::OnAccept(int32_t listener_fd)
 	}
 }
 
-void EpollEventHandler::OnDisconnect(int32_t connection_fd)
+void IOHandler::OnDisconnect(int32_t connection_fd)
 {
     DisconnectEvent *event = new DisconnectEvent;
     event->connection_fd = connection_fd;
     m_output_io_event_pipe(event);
 }
 
-void EpollEventHandler::OnRead(int32_t connection_fd)
+void IOHandler::OnRead(int32_t connection_fd)
 {
     int32_t read_len = -1;
     do {
@@ -95,7 +95,7 @@ void EpollEventHandler::OnRead(int32_t connection_fd)
     } while (true);
 }
 
-void EpollEventHandler::ParseReadBuffer(int32_t connection_fd)
+void IOHandler::ParseReadBuffer(int32_t connection_fd)
 {
     ReadEvent *event = GetUnfinishedReadEvent(connection_fd);
     if (event == nullptr)
@@ -155,7 +155,7 @@ void EpollEventHandler::ParseReadBuffer(int32_t connection_fd)
     }
 }
 
-ReadEvent *EpollEventHandler::GetUnfinishedReadEvent(int32_t connection_fd)
+ReadEvent *IOHandler::GetUnfinishedReadEvent(int32_t connection_fd)
 {
     ReadEvent *event = nullptr;
     auto iter = m_unfinished_read.find(connection_fd);
@@ -167,7 +167,7 @@ ReadEvent *EpollEventHandler::GetUnfinishedReadEvent(int32_t connection_fd)
     return event;   
 }
 
-ReadEvent *EpollEventHandler::CreateReadEvent(int32_t connection_fd)
+ReadEvent *IOHandler::CreateReadEvent(int32_t connection_fd)
 {
     ReadEvent *event = new ReadEvent;
     event->packet = m_create_net_packet_func();

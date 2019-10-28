@@ -10,8 +10,8 @@ public:
     ~ListenerThread();
 
     bool Init(uint16_t thread_id, const std::string &listen_ip, uint16_t listen_port,
-        const CreateNetPacketFunc &create_packet_func, 
-        const EpollEventHandler::OutputIOEventPipe &output_event_pipe);
+        const IOHandler::CreateNetPacketFunc &create_packet_func, 
+        const IOHandler::OutputIOEventPipe &output_event_pipe);
 
 private:
     Listener m_listener;

@@ -1,7 +1,7 @@
 #pragma once
 #include <time.h>
 #include "epoll_event_manager.h"
-#include "epoll_event_handler.h"
+#include "io_handler.h"
 
 namespace std {
     class thread;
@@ -16,8 +16,8 @@ public:
     IOThread();
     virtual ~IOThread();
 
-    virtual bool Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func, 
-        const EpollEventHandler::OutputIOEventPipe &output_event_pipe);
+    virtual bool Init(uint16_t thread_id, const IOHandler::CreateNetPacketFunc &create_packet_func, 
+        const IOHandler::OutputIOEventPipe &output_event_pipe);
 
     void Start();
     void Stop();
@@ -33,7 +33,7 @@ protected:
     std::thread *m_thread = nullptr;
 
     EpollEventManager m_epoll_event_manager;
-    EpollEventHandler m_epoll_event_handler;
+    IOHandler m_epoll_event_handler;
 
     bool m_keep_alive = true;
 

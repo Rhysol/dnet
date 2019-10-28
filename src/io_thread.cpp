@@ -14,15 +14,15 @@ IOThread::~IOThread()
     }
 }
 
-bool IOThread::Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func,
-    const EpollEventHandler::OutputIOEventPipe &output_event_pipe)
+bool IOThread::Init(uint16_t thread_id, const IOHandler::CreateNetPacketFunc &create_packet_func,
+    const IOHandler::OutputIOEventPipe &output_event_pipe)
 {
     m_thread_id = thread_id;
     m_sleep_interval.tv_sec = 0;
     m_sleep_interval.tv_nsec = 1000 * 1000; // 1ms
 
     m_epoll_event_handler.Init(create_packet_func, output_event_pipe);
-    return m_epoll_event_manager.Init(std::bind(&EpollEventHandler::HandleIOEvent, m_epoll_event_handler, std::placeholders::_1));
+    return m_epoll_event_manager.Init(std::bind(&IOHandler::HandleIOEvent, m_epoll_event_handler, std::placeholders::_1));
 }
 
 void IOThread::Start()
