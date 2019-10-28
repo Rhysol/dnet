@@ -12,11 +12,21 @@ ListenerThread::~ListenerThread()
 
 }
 
-bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint16_t listen_port, 
-    const AcceptConnectionFunc &accept_func, const ReadFunc &read_func) 
+bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint16_t listen_port,
+    const CreateNetPacketFunc &create_packet_func, const EpollEventHandler::OutputIOEventPipe &output_event_pipe) 
 {
-    if(!IOThread::Init(thread_id, read_func)) return false;
     if (!m_listener.StartListen(listen_ip, listen_port)) return false;
+
+    m_thread_id = thread_id;
+    m_sleep_interval.tv_sec = 0;
+    m_sleep_interval.tv_nsec = 1000 * 1000; // 1ms
+    m_epoll_event_handler.Init(create_packet_func, output_event_pipe);
+    if (!m_epoll_event_manager.Init(std::bind(&EpollEventHandler::HandleListenEvent, m_epoll_event_handler, 
+        std::placeholders::_1, m_listener.GetListenerFd())))
+    { 
+        std::cout << "listener epoll init failed" << std::endl;
+        return false;
+    }
 
     //把listener_fd注册到epoll
     epoll_event ev;
@@ -27,20 +37,5 @@ bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint
     {
         std::cout << "register listen event to epoll failed!" << std::endl;
         return false;
-    }
-
-    m_accept_connection_func = accept_func;
-    return true;
-}
-
-void ListenerThread::HandleEpollEvent(const epoll_event &ev)
-{
-    if (ev.data.fd == m_listener.GetListenerFd())
-    {
-        m_accept_connection_func(ev.data.fd, m_thread_id);
-    }
-    else
-    {
-        IOThread::HandleEpollEvent(ev);
     }
 }

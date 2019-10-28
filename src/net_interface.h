@@ -26,6 +26,8 @@ public:
     uint32_t body_offset = 0;
 };
 
+typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
+
 //net_manager通知
 class NetHandlerInterface
 {

@@ -24,9 +24,6 @@ bool NetManager::Init(uint16_t thread_num, const std::string &listen_ip, uint16_
     m_io_threads_num = thread_num; 
     m_net_handler = net_hander;
     m_events_queue.Init(m_io_threads_num),
-    m_io_event_pipe.Init(m_io_threads_num, 
-        std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler));
     InitThreads(listen_ip, listen_port);
     return true;
 }
@@ -36,16 +33,16 @@ void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
     m_io_threads.push_back(new ListenerThread);
     m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
     m_listener_thread->Init(0, listen_ip, listen_port, 
-        std::bind(&IOEventPipe::OnAccept, &m_io_event_pipe, std::placeholders::_1, std::placeholders::_2),
-        std::bind(&IOEventPipe::OnRead, &m_io_event_pipe, std::placeholders::_1, std::placeholders::_2));
+        std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler),
+        std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, 0));
     
     IOThread *io_thread = nullptr;
     for (uint16_t i = 1; i < m_io_threads_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
-        m_io_threads.back()->Init(i, std::bind(&IOEventPipe::OnRead, &m_io_event_pipe, 
-            std::placeholders::_1, std::placeholders::_2));
+        m_io_threads.back()->Init(i, std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler),
+            std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, i));    
     }
 
     for (auto &thread : m_io_threads)

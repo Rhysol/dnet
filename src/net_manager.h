@@ -1,9 +1,8 @@
 #pragma once
 #include <vector>
 #include "connection_manager.h"
-#include "io_event_pipe.h"
 #include "mpsc_queue.h"
-#include "net_interface.h"
+#include "io_event.h"
 
 
 class IOThread;
@@ -38,11 +37,7 @@ private:
     std::vector<IOThread *> m_io_threads;
     uint16_t m_io_threads_num;
 
-    IOEventPipe m_io_event_pipe;
     MPSCQueue<IOEvent> m_events_queue;
-
-    // HandlePacketFunc m_handle_packet_func;
-    // HandleDisconnectFunc m_handle_disconnect_func;
 
     ConnectionManager m_connection_manager;
 

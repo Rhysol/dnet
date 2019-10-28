@@ -14,14 +14,15 @@ IOThread::~IOThread()
     }
 }
 
-bool IOThread::Init(uint16_t thread_id, const ReadFunc &func)
+bool IOThread::Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func,
+    const EpollEventHandler::OutputIOEventPipe &output_event_pipe)
 {
-    if (!func) return false;
     m_thread_id = thread_id;
-    m_read_func = func;
     m_sleep_interval.tv_sec = 0;
     m_sleep_interval.tv_nsec = 1000 * 1000; // 1ms
-    return m_epoll_event_manager.Init(std::bind(&IOThread::HandleEpollEvent, this, std::placeholders::_1));
+
+    m_epoll_event_handler.Init(create_packet_func, output_event_pipe);
+    return m_epoll_event_manager.Init(std::bind(&EpollEventHandler::HandleIOEvent, m_epoll_event_handler, std::placeholders::_1));
 }
 
 void IOThread::Start()
@@ -63,14 +64,3 @@ void IOThread::RegisterConnectionFd(int32_t fd)
     //todo,立即进行read
     //...
 }
-
-void IOThread::HandleEpollEvent(const epoll_event &ev)
-{
-    if (ev.events & EPOLLIN)
-    {
-        m_read_func(ev.data.fd, m_thread_id);
-    }
-}
-
- 
-
