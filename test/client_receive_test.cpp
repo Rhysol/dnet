@@ -6,7 +6,10 @@ int32_t DoRead(const Connection &client)
 {
     char buffer[1024];
     int32_t read_num = read(client.fd, buffer, 1024);
-	std::cout << "read_num[" << read_num << "]" << std::endl;
+    if (read_num > 0)
+    {
+        std::cout << "read_num[" << read_num << "]" << std::endl;
+    }
     if (read_num == 0)
     {
         exit(0);

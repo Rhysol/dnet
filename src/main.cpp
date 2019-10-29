@@ -85,6 +85,7 @@ int main(int argc, char *argv[])
 		if (SendMessage() == 0)
 		{
 			net.Stop();
+		    end = std::chrono::system_clock::now();
 			break;
 		}
 		handle_count = net.Update();
