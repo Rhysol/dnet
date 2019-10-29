@@ -1,5 +1,5 @@
 #include <iostream>
-#include "src/mpsc_queue.h"
+#include "../src/mpsc_queue.h"
 #include <thread>
 #include <vector>
 #include <chrono>
