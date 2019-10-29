@@ -19,9 +19,11 @@ Listener::~Listener()
 	}
 }
 
-bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port)
+bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port, const OutputIOEventPipe &output_event_pipe)
 {
 	if (m_listener_fd != -1) return true;
+
+    m_output_io_event_pipe = output_event_pipe;
 
 	m_listen_ip = listen_ip;
 	m_listen_port = listen_port;
@@ -54,37 +56,24 @@ bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port)
 	return true;
 }
  
-// void Listener::HandleIO(const epoll_event &ev)
-// {
-// 	char buffer[65536];
-// 	if (ev.events & EPOLLOUT)
-// 	{
-// 		std::cout << "write event" << std::endl;
-// 	}
-// 	if (ev.events & EPOLLIN)
-// 	{
-// 		memset(buffer, 0, 1024);
-// 		int read_len = read(ev.data.fd, buffer, 1024);
-// 		std::cout << "read_len[" << read_len << "], " << buffer << std::endl;
-// 		if (read_len == 0)
-// 		{
-// 			epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, ev.data.fd, NULL);
-// 			return;
-// 		}
-
-// 		if (read_len != -1)
-// 		{
-// 			int write_len = write(ev.data.fd, buffer, read_len);
-// 			std::cout << "write_len[" << write_len << "]" << std::endl;
-// 			if (write_len == -1 && errno == EAGAIN)
-// 			{
-// 				std::cout << "write failed EAGAIN" << std::endl;
-// 			}
-// 		}
-// 	}
-
-// 	memset(&m_event_tmp, 0, sizeof(m_event_tmp));
-// 	m_event_tmp.events = EPOLLIN | EPOLLOUT | EPOLLET;
-// 	m_event_tmp.data.fd = ev.data.fd;
-// 	epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, ev.data.fd, &m_event_tmp);
-// }
+void Listener::OnAccept()
+{
+    sockaddr_in client_addr;
+    memset(&client_addr, 0, sizeof(sockaddr_in));
+    socklen_t len = sizeof(sockaddr);
+	int client_fd = accept4(m_listener_fd, (sockaddr *)&client_addr, &len, SOCK_NONBLOCK | SOCK_CLOEXEC);
+	if (client_fd == -1)
+	{
+		std::cout << "accept client failed! errno[" << errno << "]" << std::endl;
+	}
+	else
+	{
+        AcceptConnectionEvent *event = new AcceptConnectionEvent; //在net_manager内被删除
+        event->connection_fd = client_fd;
+        event->remote_ip = inet_ntoa(client_addr.sin_addr);
+        event->remote_port = ntohs(client_addr.sin_port);
+        m_output_io_event_pipe(event);
+		std::cout << "accept client, ip[" << event->remote_ip << 
+		"] port[" << event->remote_port << "]" << std::endl; 
+	}
+}

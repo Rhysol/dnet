@@ -14,7 +14,7 @@ public:
 	EpollEventManager();
 	~EpollEventManager();
 
-	bool Init(const HandleEventFunc &func, uint32_t max_events_num = 10);
+	bool Init(const HandleEventFunc &func, uint32_t max_events_num = 100);
 
 	uint32_t Update();
 

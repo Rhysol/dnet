@@ -1,79 +1,29 @@
-#include "io_handler.h"
+#include "read_handler.h"
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstring>
-#include <iostream>
 
 
-IOHandler::IOHandler()
+ReadHandler::ReadHandler()
 {
 
 }
 
-IOHandler::~IOHandler()
+ReadHandler::~ReadHandler()
 {
 
 }
 
-void IOHandler::Init(const CreateNetPacketFunc &create_packt_func, const OutputIOEventPipe &pipe)
+void ReadHandler::Init(const CreateNetPacketFunc &create_packt_func, const OutputIOEventPipe &pipe)
 {
     m_output_io_event_pipe = pipe;
     m_create_net_packet_func = create_packt_func;
 }
 
-void IOHandler::HandleListenEvent(const epoll_event &ev, int32_t listener_fd)
-{
-    if (ev.data.fd == listener_fd)
-    {
-        OnAccept(listener_fd);
-    }
-    else
-    {
-        HandleIOEvent(ev);
-    }
-}
-
-void IOHandler::HandleIOEvent(const epoll_event &ev)
-{
-    if (ev.events & EPOLLIN)
-    {
-        OnRead(ev.data.fd);
-    }
-}
-
-void IOHandler::OnAccept(int32_t listener_fd)
-{
-    sockaddr_in client_addr;
-    memset(&client_addr, 0, sizeof(sockaddr_in));
-    socklen_t len = sizeof(sockaddr);
-	int client_fd = accept4(listener_fd, (sockaddr *)&client_addr, &len, SOCK_NONBLOCK | SOCK_CLOEXEC);
-	if (client_fd == -1)
-	{
-		std::cout << "accept client failed! errno[" << errno << "]" << std::endl;
-	}
-	else
-	{
-        AcceptedConnectionEvent *event = new AcceptedConnectionEvent; //在net_manager内被删除
-        event->connection_fd = client_fd;
-        event->remote_ip = inet_ntoa(client_addr.sin_addr);
-        event->remote_port = ntohs(client_addr.sin_port);
-        m_output_io_event_pipe(event);
-		std::cout << "accept client, ip[" << event->remote_ip << 
-		"] port[" << event->remote_port << "]" << std::endl; 
-	}
-}
-
-void IOHandler::OnDisconnect(int32_t connection_fd)
-{
-    DisconnectEvent *event = new DisconnectEvent;
-    event->connection_fd = connection_fd;
-    m_output_io_event_pipe(event);
-}
-
-void IOHandler::OnRead(int32_t connection_fd)
+void ReadHandler::OnRead(int32_t connection_fd)
 {
     int32_t read_len = -1;
     do {
@@ -85,7 +35,7 @@ void IOHandler::OnRead(int32_t connection_fd)
         }
         else if (read_len == 0)
         {
-            OnDisconnect(connection_fd);
+            OnUnexpectedDisconnect(connection_fd);
             return;
         }
         else if (read_len == -1)
@@ -95,7 +45,7 @@ void IOHandler::OnRead(int32_t connection_fd)
     } while (true);
 }
 
-void IOHandler::ParseReadBuffer(int32_t connection_fd)
+void ReadHandler::ParseReadBuffer(int32_t connection_fd)
 {
     ReadEvent *event = GetUnfinishedReadEvent(connection_fd);
     if (event == nullptr)
@@ -155,7 +105,7 @@ void IOHandler::ParseReadBuffer(int32_t connection_fd)
     }
 }
 
-ReadEvent *IOHandler::GetUnfinishedReadEvent(int32_t connection_fd)
+ReadEvent *ReadHandler::GetUnfinishedReadEvent(int32_t connection_fd)
 {
     ReadEvent *event = nullptr;
     auto iter = m_unfinished_read.find(connection_fd);
@@ -167,11 +117,33 @@ ReadEvent *IOHandler::GetUnfinishedReadEvent(int32_t connection_fd)
     return event;   
 }
 
-ReadEvent *IOHandler::CreateReadEvent(int32_t connection_fd)
+ReadEvent *ReadHandler::CreateReadEvent(int32_t connection_fd)
 {
     ReadEvent *event = new ReadEvent;
     event->packet = m_create_net_packet_func();
     event->packet->body_len = event->packet->ParseBodyLenFromHeader();
     event->connection_fd = connection_fd;
     return event;
+}
+
+void ReadHandler::OnUnexpectedDisconnect(int32_t connection_fd)
+{
+    UnexpectedDisconnectEvent *event = new UnexpectedDisconnectEvent;
+    event->connection_fd = connection_fd;
+    m_output_io_event_pipe(event);
+}
+
+void ReadHandler::ClearUnfinishedRead(int32_t connection_fd)
+{
+    auto iter = m_unfinished_read.find(connection_fd);
+    if (iter!= m_unfinished_read.end())
+    {
+        delete iter->second;
+        m_unfinished_read.erase(connection_fd);
+    }
+}
+
+void ReadHandler::OnCloseConnection(int32_t connection_fd)
+{
+    ClearUnfinishedRead(connection_fd);
 }

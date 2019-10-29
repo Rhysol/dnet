@@ -28,9 +28,9 @@ private:
     uint16_t HashToIoThread(int32_t connection_fd);
     void AcceptIOEvent(IOEvent *event, uint16_t thread_id);
 
-    void HandleAcceptedConnectionEvent(const AcceptedConnectionEvent &event);
-    void HandleReadEvent(const ReadEvent &event);
-    void HandleDisconnectEvent(const DisconnectEvent &event);
+    void OnAcceptConnection(const AcceptConnectionEvent &event);
+    void OnRead(const ReadEvent &event);
+    void OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event);
 
 private:
     ListenerThread *m_listener_thread;

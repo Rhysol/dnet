@@ -72,14 +72,14 @@ uint32_t NetManager::Update()
     {
         switch (event->event_type)
         {
-        case IOEvent::EventType::ACCEPTED_CONNECTION:
-            HandleAcceptedConnectionEvent((AcceptedConnectionEvent &)(*event));
+        case IOEvent::EventType::ACCEPT_CONNECTION:
+            OnAcceptConnection((AcceptConnectionEvent &)(*event));
             break;
         case IOEvent::EventType::READ:
-            HandleReadEvent((ReadEvent &)(*event));
+            OnRead((ReadEvent &)(*event));
             break;
-        case IOEvent::EventType::DISCONNECTED:
-            HandleDisconnectEvent((DisconnectEvent &)(*event));
+        case IOEvent::EventType::CLOSE_CONNECTION_COMPLETE:
+            OnCloseConnectionComplete((CloseConnectionCompleteEvent &)(*event));
             break;
         default:
             { std::cout << "unkown event type" << std::endl; }
@@ -93,21 +93,24 @@ uint32_t NetManager::Update()
     return handle_count;
 }
 
-void NetManager::HandleAcceptedConnectionEvent(const AcceptedConnectionEvent &event)
+//从listener thread接收的新连接
+void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
 {
     const Connection *connection = m_connection_manager.AddConnection(event.connection_fd, 
         event.remote_ip, event.remote_port);
     if (connection == nullptr) return;
     uint16_t io_thread_id = HashToIoThread(connection->fd);
-    m_io_threads[io_thread_id]->RegisterConnectionFd(connection->fd);
+    RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
+    to_thread_event->connection_fd = event.connection_fd; 
+    m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
 }
 
-void NetManager::HandleReadEvent(const ReadEvent &event)
+void NetManager::OnRead(const ReadEvent &event)
 {
     //m_net_handler->HandlePacket(*event.packet);
 }
 
-void NetManager::HandleDisconnectEvent(const DisconnectEvent &event)
+void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)
 {
     m_connection_manager.DisconnectFrom(event.connection_fd);
     // m_net_handler->HandleDisconnect(event.connection_fd);
@@ -119,7 +122,9 @@ const Connection *NetManager::ConnectTo(const std::string &remote_ip, uint16_t r
     if (connection != nullptr)
     {
         uint16_t io_thread_id = HashToIoThread(connection->fd);
-        m_io_threads[io_thread_id]->RegisterConnectionFd(connection->fd);
+        RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
+        to_thread_event->connection_fd = connection->fd; 
+        m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
     }
     return connection;
 }

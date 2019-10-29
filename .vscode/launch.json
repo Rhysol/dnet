@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/net_lib",
-            "args": ["7", "500000"],
+            "args": ["1", "100000"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
