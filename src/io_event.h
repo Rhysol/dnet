@@ -110,7 +110,7 @@ struct PacketToSend
 struct WriteEvent : public IOEvent
 {
     WriteEvent() {
-        event_type = READ;
+        event_type = WRITE;
     }
     ~WriteEvent() {
         if (packet != nullptr)
