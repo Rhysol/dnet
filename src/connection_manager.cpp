@@ -6,15 +6,6 @@
 #include <iostream>
 #include <unistd.h>
 
-
-void ConnectionManager::CloseAllConnections()
-{
-    for (auto &iter : m_connections)
-    {
-        close(iter.first);
-    }
-}
-
 const Connection *ConnectionManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
 {
     sockaddr_in remote_addr;

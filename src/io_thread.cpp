@@ -57,6 +57,10 @@ void IOThread::Update()
             nanosleep(&m_sleep_interval, NULL);
         }
     }
+    while(HandleIOEvent() != 0)
+    {
+        
+    }
     std::cout << "thread:" << m_thread_id << " stoped" << std::endl;
 }
 

@@ -15,14 +15,13 @@ class ConnectionManager
 {
 public:
 
-    void CloseAllConnections();
-
     const Connection *ConnectTo(const std::string &remote_ip, uint16_t port);
     const Connection *AddConnection(int32_t connection_fd, const std::string &remote_ip, uint16_t remote_port);
 
     void DisconnectFrom(int32_t fd);
 
     const Connection *GetConnection(int32_t connection_fd);
+    inline const std::unordered_map<int32_t, Connection> &GetAllConnections() { return m_connections; }
 
 private:
     void HandleDuplicatedFd(int32_t fd);

@@ -22,6 +22,7 @@ public:
 
     const Connection *ConnectTo(const std::string &remote_ip, uint16_t remote_port);
     bool Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len);
+    void CloseConnection(int32_t connection_fd);
 
 private:
     void InitThreads(const std::string &listen_ip, uint16_t listen_port);
@@ -32,6 +33,8 @@ private:
     void OnAcceptConnection(const AcceptConnectionEvent &event);
     void OnRead(const ReadEvent &event);
     void OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event);
+
+    void CloseAllConnections();
 
 private:
     ListenerThread *m_listener_thread;

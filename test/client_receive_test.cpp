@@ -18,7 +18,7 @@ void WaitAWhile()
 {
 	timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = 10000;
+	t.tv_nsec = 1000 * 1000;
 	nanosleep(&t, NULL);
 }
 

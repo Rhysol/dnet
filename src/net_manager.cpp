@@ -54,12 +54,12 @@ void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
 
 void NetManager::Stop()
 {
+    CloseAllConnections();
     for (auto &thread : m_io_threads)
     {
         thread->Stop();
         thread->Join();
     }
-    m_connection_manager.CloseAllConnections();
     m_keep_alive = false;
     std::cout << "io thread stoped" << std::endl;
 }
@@ -151,6 +151,14 @@ bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t da
     return true;
 }
 
+void NetManager::CloseConnection(int32_t connection_fd)
+{
+    uint16_t io_thread_id = HashToIoThread(connection_fd);
+    CloseConnectionRequestEvent *event = new CloseConnectionRequestEvent;
+    event->connection_fd = connection_fd;
+    m_io_threads[io_thread_id]->AcceptIOEvent(event);
+}
+
 void NetManager::AcceptIOEvent(IOEvent *event, uint16_t thread_id)
 {
     m_events_queue.Enqueue(event, thread_id);
@@ -160,4 +168,12 @@ uint16_t NetManager::HashToIoThread(int32_t connection_fd)
 {
     uint16_t thread_id = connection_fd % (int32_t)m_io_threads_num;
     return thread_id;
+}
+
+void NetManager::CloseAllConnections()
+{
+    for (auto &iter : m_connection_manager.GetAllConnections())
+    {
+        CloseConnection(iter.first);
+    }
 }
