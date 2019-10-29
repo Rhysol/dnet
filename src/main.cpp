@@ -4,6 +4,8 @@
 #include <time.h>
 #include "net_manager.h"
 #include <chrono>
+#include <set>
+#include <vector>
 
 
 void WaitAWhile()
@@ -26,35 +28,61 @@ public:
 	}
 };
 
-class NetHandler : public NetHandlerInterface
+std::set<int32_t> connected_fd;
+class NetHandler : public NetEventInterface
 {
 public:
     virtual NetPacketInterface *CreateNetPacket() override
 	{
 		return new NetPacket(512);
 	}
-    virtual void HandlePacket(const NetPacketInterface &) override
+	virtual void OnNewConnection(int32_t connection_fd) override
+	{
+		connected_fd.emplace(connection_fd);
+	}
+    virtual void OnReceivePacket(const NetPacketInterface &) override
 	{
 
 	}
-    virtual void HandleDisconnect(int32_t connection_fd) override
+    virtual void OnDisconnect(int32_t connection_fd) override
 	{
-
+		std::cout << "connection:" << connection_fd << "disconnect" << std::endl;
+		connected_fd.erase(connection_fd);
 	}
 };
 
+NetHandler handler;
+NetManager net;
+
+uint32_t total_send_num = 0;
+int32_t SendMessage()
+{
+	static uint32_t sended_num = 0;
+	char data[1024];
+	for (int32_t fd : connected_fd)
+	{
+		net.Send(fd, data, 1024);
+		++sended_num;
+	}
+	if (sended_num > total_send_num)
+	{
+		return 0;
+	}
+	return -1;
+}
+
 int main(int argc, char *argv[])
 {
-	NetHandler handler;
-	NetManager net;
 	net.Init(std::atoi(argv[1]), "0.0.0.0", 18889, &handler);
 	uint32_t handle_count = 0;
 	uint32_t handleed_count = 0;
 	auto start = std::chrono::system_clock::now();
 	auto end = start;
 	uint32_t total_handle_num = std::atoi(argv[2]);
+	total_send_num = std::atoi(argv[3]);
 	while (net.IsAlive() || handle_count != 0)
 	{
+		if (SendMessage() == 0) break;
 		handle_count = net.Update();
 		handleed_count += handle_count;
 		if (handleed_count >= total_handle_num)

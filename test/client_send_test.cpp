@@ -24,13 +24,6 @@ void DoSend(const Connection &client)
 	std::cout << "write_num[" << write_num << "]" << std::endl;
 }
 
-void DoRead(const Connection &client)
-{
-    char buffer[1024];
-    int read_num = read(client.fd, buffer, 256);
-	std::cout << "read_num[" << read_num << "]" << std::endl;
-}
-
 void WaitAWhile()
 {
 	timespec t;

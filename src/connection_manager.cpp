@@ -72,3 +72,13 @@ void ConnectionManager::DisconnectFrom(int32_t fd)
     close(fd);
     m_connections.erase(fd);
 }
+
+const Connection *ConnectionManager::GetConnection(int32_t connection_fd)
+{
+    auto iter = m_connections.find(connection_fd);
+    if (iter != m_connections.end())
+    {
+        return &iter->second;
+    }
+    return nullptr;
+}

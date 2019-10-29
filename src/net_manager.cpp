@@ -1,5 +1,6 @@
 #include "net_manager.h"
 #include "listener_thread.h"
+#include <cstring>
 
 
 NetManager::NetManager()
@@ -18,11 +19,11 @@ NetManager::~NetManager()
 }
 
 bool NetManager::Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port,
-    NetHandlerInterface *net_hander)
+    NetEventInterface *net_hander)
 {
     if (net_hander == nullptr) return false;
     m_io_threads_num = thread_num; 
-    m_net_handler = net_hander;
+    m_net_event_handler = net_hander;
     m_events_queue.Init(m_io_threads_num),
     InitThreads(listen_ip, listen_port);
     return true;
@@ -33,7 +34,7 @@ void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
     m_io_threads.push_back(new ListenerThread);
     m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
     m_listener_thread->Init(0, listen_ip, listen_port, 
-        std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler),
+        std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler),
         std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, 0));
     
     IOThread *io_thread = nullptr;
@@ -41,7 +42,7 @@ void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
-        m_io_threads.back()->Init(i, std::bind(&NetHandlerInterface::CreateNetPacket, m_net_handler),
+        m_io_threads.back()->Init(i, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler),
             std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, i));    
     }
 
@@ -103,17 +104,18 @@ void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
     RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
     to_thread_event->connection_fd = event.connection_fd; 
     m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
+    m_net_event_handler->OnNewConnection(event.connection_fd);
 }
 
 void NetManager::OnRead(const ReadEvent &event)
 {
-    //m_net_handler->HandlePacket(*event.packet);
+    m_net_event_handler->OnReceivePacket(*event.packet);
 }
 
 void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)
 {
     m_connection_manager.DisconnectFrom(event.connection_fd);
-    // m_net_handler->HandleDisconnect(event.connection_fd);
+    m_net_event_handler->OnDisconnect(event.connection_fd);
 }
 
 const Connection *NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
@@ -127,6 +129,26 @@ const Connection *NetManager::ConnectTo(const std::string &remote_ip, uint16_t r
         m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
     }
     return connection;
+}
+
+bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len)
+{
+    if (data_len == 0)
+    {
+        std::cout << "send data length is 0" << std::endl;
+        return false;
+    }
+    if (m_connection_manager.GetConnection(connection_fd) == nullptr)
+    {
+        std::cout << "invalid connection_fd:" << connection_fd << std::endl;
+        return false;
+    }
+    WriteEvent *event = new WriteEvent;
+    event->packet = new PacketToSend(connection_fd, data_len);
+    memcpy(event->packet->packet_bytes, data_bytes, data_len);
+    uint16_t io_thread_id = HashToIoThread(connection_fd);
+    m_io_threads[io_thread_id]->AcceptIOEvent(event);
+    return true;
 }
 
 void NetManager::AcceptIOEvent(IOEvent *event, uint16_t thread_id)

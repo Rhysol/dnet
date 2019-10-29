@@ -15,12 +15,13 @@ public:
     NetManager();
     ~NetManager();
 
-    bool Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port, NetHandlerInterface *net_handler);
+    bool Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port, NetEventInterface *net_event_handler);
     uint32_t Update();
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
 
     const Connection *ConnectTo(const std::string &remote_ip, uint16_t remote_port);
+    bool Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len);
 
 private:
     void InitThreads(const std::string &listen_ip, uint16_t listen_port);
@@ -41,7 +42,7 @@ private:
 
     ConnectionManager m_connection_manager;
 
-    NetHandlerInterface *m_net_handler;
+    NetEventInterface *m_net_event_handler;
 
     bool m_keep_alive = true;
 };

@@ -22,6 +22,8 @@ public:
 
     void DisconnectFrom(int32_t fd);
 
+    const Connection *GetConnection(int32_t connection_fd);
+
 private:
     void HandleDuplicatedFd(int32_t fd);
 
