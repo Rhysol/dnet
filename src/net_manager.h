@@ -3,6 +3,7 @@
 #include "connection_manager.h"
 #include "mpsc_queue.h"
 #include "io_event.h"
+#include "net_config.h"
 
 
 class IOThread;
@@ -15,7 +16,7 @@ public:
     NetManager();
     ~NetManager();
 
-    bool Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port, NetEventInterface *net_event_handler);
+    bool Init(const NetConfig &config, NetEventInterface *net_event_handler);
     uint32_t Update();
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
@@ -39,7 +40,6 @@ private:
 private:
     ListenerThread *m_listener_thread;
     std::vector<IOThread *> m_io_threads;
-    uint16_t m_io_threads_num;
 
     MPSCQueue<IOEvent> m_events_queue;
 

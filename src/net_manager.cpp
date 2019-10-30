@@ -1,7 +1,9 @@
 #include "net_manager.h"
 #include "listener_thread.h"
 #include <cstring>
+#include "net_config.h"
 
+NetConfig global_config;
 
 NetManager::NetManager()
 {
@@ -18,14 +20,13 @@ NetManager::~NetManager()
     }
 }
 
-bool NetManager::Init(uint16_t thread_num, const std::string &listen_ip, uint16_t listen_port,
-    NetEventInterface *net_hander)
+bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
 {
     if (net_hander == nullptr) return false;
-    m_io_threads_num = thread_num; 
+    global_config = config;
     m_net_event_handler = net_hander;
-    m_events_queue.Init(m_io_threads_num),
-    InitThreads(listen_ip, listen_port);
+    m_events_queue.Init(global_config.io_thread_num),
+    InitThreads(global_config.listen_ip, global_config.listen_port);
     return true;
 }
 
@@ -38,7 +39,7 @@ void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
         std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, 0));
     
     IOThread *io_thread = nullptr;
-    for (uint16_t i = 1; i < m_io_threads_num; i++)
+    for (uint16_t i = 1; i < global_config.io_thread_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
@@ -66,7 +67,6 @@ void NetManager::Stop()
 
 uint32_t NetManager::Update()
 {
-    uint16_t one_turn_handle_num = 100;
     IOEvent *event = m_events_queue.Dequeue();
     uint16_t handle_count = 0;
     while (event != nullptr)
@@ -88,7 +88,7 @@ uint32_t NetManager::Update()
         }
         delete event;//由io_event_pipe创建
         ++handle_count;
-        if (handle_count >= one_turn_handle_num) break;
+        if (handle_count >= global_config.net_manager_handle_io_event_num_of_one_update) break;
         event = m_events_queue.Dequeue();
     }
     return handle_count;
@@ -167,7 +167,7 @@ void NetManager::AcceptIOEvent(IOEvent *event, uint16_t thread_id)
 
 uint16_t NetManager::HashToIoThread(int32_t connection_fd)
 {
-    uint16_t thread_id = connection_fd % (int32_t)m_io_threads_num;
+    uint16_t thread_id = connection_fd % (int32_t)global_config.io_thread_num;
     return thread_id;
 }
 

@@ -54,5 +54,5 @@ protected:
     MPSCQueue<IOEvent> m_io_events;
 
     bool m_keep_alive = true;
-    timespec m_sleep_interval;
+    timespec m_sleep_duration;
 };

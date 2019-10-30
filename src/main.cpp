@@ -12,7 +12,7 @@ void WaitAWhile()
 {
 	timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = 1000 * 10; //1ms
+	t.tv_nsec = 1000 * 1000; //1ms
 	nanosleep(&t, NULL);
 }
 
@@ -74,7 +74,11 @@ int32_t SendMessage()
 
 int main(int argc, char *argv[])
 {
-	net.Init(std::atoi(argv[1]), "0.0.0.0", 18889, &handler);
+	NetConfig config;
+	config.io_thread_num = std::atoi(argv[1]);
+	config.listen_ip = "0.0.0.0";
+	config.listen_port = 18889;
+	net.Init(config, &handler);
 	uint32_t handle_count = 0;
 	uint32_t handleed_count = 0;
 	auto start = std::chrono::system_clock::now();
@@ -83,12 +87,12 @@ int main(int argc, char *argv[])
 	total_send_num = std::atoi(argv[3]);
 	while (net.IsAlive() || handle_count != 0)
 	{
-		if (SendMessage() == 0)
-		{
-			net.Stop();
-		    end = std::chrono::system_clock::now();
-			break;
-		}
+		// if (SendMessage() == 0)
+		// {
+		// 	net.Stop();
+		//     end = std::chrono::system_clock::now();
+		// 	break;
+		// }
 		handle_count = net.Update();
 		handleed_count += handle_count;
 		if (handleed_count >= total_handle_num)

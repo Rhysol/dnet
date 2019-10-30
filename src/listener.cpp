@@ -4,6 +4,7 @@
 #include <netinet/ip.h>
 #include <arpa/inet.h>
 #include <cstring>
+#include "net_config.h"
 
 uint16_t Listener::listen_queue_max_count = 1000;
 
@@ -47,7 +48,7 @@ bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port, c
 		std::cout << "bind listener fd failed" << std::endl;
 		return false;
 	}
-	if (listen(m_listener_fd, listen_queue_max_count) == -1)
+	if (listen(m_listener_fd, global_config.listen_queue_max_num) == -1)
 	{
 		std::cout << "listen failed" << std::endl;
 		return false;

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
+#include "net_config.h"
 
 WriteHandler::WriteHandler()
 {
@@ -93,8 +94,8 @@ void WriteHandler::OnUnfinishedPacket(PacketToSend *packet)
 {
     std::deque<PacketToSend *> &unfinished_packet = m_unfinished_packet[packet->connection_fd];
     unfinished_packet.push_back(new PacketToSend(std::move(*packet)));
-    //积压超过10个包就断开链接
-    if (unfinished_packet.size() > 10)
+    //积压超过一定数量就断开链接
+    if (unfinished_packet.size() > global_config.max_unfinished_send_packet)
     {
         std::cout << "fd:" << packet->connection_fd << " unsended packet more than 10, close connection!" << std::endl;
         OnUnexpectedDisconnect(packet->connection_fd);

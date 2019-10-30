@@ -18,8 +18,8 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
     const OutputIOEventPipe &output_event_pipe)
 {
     m_thread_id = thread_id;
-    m_sleep_interval.tv_sec = 0;
-    m_sleep_interval.tv_nsec = 1000 * 1000; // 1ms
+    m_sleep_duration.tv_sec = 0;
+    m_sleep_duration.tv_nsec = 1000 * global_config.io_thread_sleep_duration; // 1ms
 
     m_output_io_event_pipe = output_event_pipe;
     m_read_handler.Init(create_packet_func, std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
@@ -54,7 +54,7 @@ void IOThread::Update()
 
         if(m_epoll_event_manager.Update() == 0)
         {
-            nanosleep(&m_sleep_interval, NULL);
+            nanosleep(&m_sleep_duration, NULL);
         }
     }
     while(HandleIOEvent() != 0)
@@ -85,7 +85,6 @@ void IOThread::HandleEpollEvent(const epoll_event &ev)
 
 uint32_t IOThread::HandleIOEvent()
 {
-    uint16_t one_turn_handle_num = 100;
     IOEvent *event = m_io_events.Dequeue();
     uint16_t handle_count = 0;
     while (event != nullptr)
@@ -107,7 +106,7 @@ uint32_t IOThread::HandleIOEvent()
         }
         delete event;//由io_event_pipe创建
         ++handle_count;
-        if (handle_count >= one_turn_handle_num) break;
+        if (handle_count >= global_config.io_thread_handle_io_event_num_of_one_update) break;
         event = m_io_events.Dequeue();
     }
     return handle_count;

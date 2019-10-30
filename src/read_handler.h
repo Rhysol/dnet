@@ -1,15 +1,21 @@
 #pragma once
 #include "io_event.h"
 #include <unordered_map>
+#include "net_config.h"
 
 
 struct ReadBuffer
 {
-    inline static uint32_t BufferMaxLen() {
-        static uint32_t buffer_max_len = 65535;
-        return buffer_max_len;
+    ReadBuffer() {
+        buffer = new char[global_config.read_buffer_size];
     }
-    char buffer[65535];
+    ~ReadBuffer() {
+        delete[] buffer;
+    }
+    inline static uint32_t BufferMaxLen() {
+        return global_config.read_buffer_size;
+    }
+    char *buffer;
     uint32_t buffer_len = 0;
 };
 

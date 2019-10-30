@@ -1,4 +1,5 @@
 #include "epoll_event_manager.h"
+#include "net_config.h"
 
 EpollEventManager::EpollEventManager()
 {
@@ -16,16 +17,15 @@ EpollEventManager::~EpollEventManager()
 bool EpollEventManager::Init(const HandleEventFunc &func, uint32_t max_events_num)
 {
 	if (max_events_num == 0 || !func) return false;
-	m_max_events_num = max_events_num;
 	m_handle_event_func = func;
 	m_epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	m_events = new epoll_event[m_max_events_num];
+	m_events = new epoll_event[global_config.epoll_max_event_num];
 	return true;
 }
 
 uint32_t EpollEventManager::Update()
 {
-	int event_num = epoll_wait(m_epoll_fd, m_events, m_max_events_num, 0);
+	int event_num = epoll_wait(m_epoll_fd, m_events, global_config.epoll_max_event_num, 0);
 	if (event_num == -1)
 	{
 		std::cout << "epoll_wait failed" << std::endl;

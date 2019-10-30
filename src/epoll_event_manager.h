@@ -29,7 +29,6 @@ public:
 private:
 	int m_epoll_fd;
 	epoll_event *m_events = nullptr;
-	uint32_t m_max_events_num;
 	HandleEventFunc m_handle_event_func;
 	std::set<int32_t> m_monitoring_fd;
 };
