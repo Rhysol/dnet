@@ -11,7 +11,7 @@ set (CMAKE_CXX_STANDARD 11)
 
 add_library(obj_net OBJECT src/listener.cpp src/connection_manager.cpp src/epoll_event_manager.cpp
 src/read_handler.cpp src/write_handler.cpp src/io_thread.cpp src/listener_thread.cpp src/net_manager.cpp)
-target_link_libraries(obj_net pthread profiler tcmalloc)
+target_link_libraries(obj_net pthread)
 
 set_property(TARGET obj_net PROPERTY POSITION_INDEPENDENT_CODE 1)
 
@@ -21,4 +21,4 @@ add_library(net_static STATIC $<TARGET_OBJECTS:obj_net>)
 set_target_properties(net_static PROPERTIES OUTPUT_NAME net)
 
 add_executable(server test/main.cpp)
-target_link_libraries(server net)
+target_link_libraries(server net profiler tcmalloc)
