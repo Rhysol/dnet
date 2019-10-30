@@ -6,4 +6,6 @@ CMakeFiles/*
 cmake_install.cmake
 CMakeCache.txt
 Makefile
-net_lib
+libnet.a
+libnet.so
+server
