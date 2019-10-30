@@ -3,6 +3,7 @@
 #include "epoll_event_manager.h"
 #include "read_handler.h"
 #include "write_handler.h"
+#include <set>
 
 namespace std {
     class thread;
@@ -38,6 +39,7 @@ protected:
     void OnCloseConnectionRequest(const CloseConnectionRequestEvent &event);
 
     void BeforeOutputIOEvent(IOEvent *io_event);
+    void CloseConnection(int32_t connection_fd);
 
 protected:
     uint16_t m_thread_id;
@@ -52,6 +54,5 @@ protected:
     MPSCQueue<IOEvent> m_io_events;
 
     bool m_keep_alive = true;
-
     timespec m_sleep_interval;
 };

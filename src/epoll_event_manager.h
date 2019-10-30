@@ -24,6 +24,8 @@ public:
 	//将fd从epoll的监听列表中移除
 	void StopMonitorFd(int32_t fd);
 
+	bool IsFdMonitored(int32_t fd);
+
 private:
 	int m_epoll_fd;
 	epoll_event *m_events = nullptr;

@@ -12,7 +12,7 @@ void WaitAWhile()
 {
 	timespec t;
 	t.tv_sec = 0;
-	t.tv_nsec = 1000 * 1000; //1ms
+	t.tv_nsec = 1000 * 10; //1ms
 	nanosleep(&t, NULL);
 }
 
@@ -46,7 +46,7 @@ public:
 	}
     virtual void OnDisconnect(int32_t connection_fd) override
 	{
-		std::cout << "connection:" << connection_fd << "disconnect" << std::endl;
+		std::cout << "connection: " << connection_fd << " disconnect" << std::endl;
 		connected_fd.erase(connection_fd);
 	}
 };

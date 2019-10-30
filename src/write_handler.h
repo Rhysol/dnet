@@ -15,13 +15,14 @@ public:
 
     void Send(PacketToSend *packet);
 
+    //发送完所有积压的包返回true, 否则返回false
     bool HandleUnfinishedPacket(int32_t connection_fd);
 
     void OnCloseConnection(int32_t connection_fd);
 
 private:
     void OnUnfinishedPacket(PacketToSend *packet);
-    void SendUnfinishedPacket(PacketToSend *packet);
+    void SendUnfinishedPacket(std::deque<PacketToSend *> &unfinished_queue);
     void ClearUnfinishedPacket(int32_t connection_fd);
 
     void OnUnexpectedDisconnect(int32_t connection_fd);

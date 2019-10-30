@@ -59,7 +59,7 @@ void IOThread::Update()
     }
     while(HandleIOEvent() != 0)
     {
-        
+
     }
     std::cout << "thread:" << m_thread_id << " stoped" << std::endl;
 }
@@ -113,26 +113,27 @@ uint32_t IOThread::HandleIOEvent()
     return handle_count;
 }
 
-void IOThread::OnRegisterConnection(const RegisterConnectionEvent &event)
+void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
 {
     epoll_event ev;
     ev.events = EPOLLIN | EPOLLET;
-    ev.data.fd = event.connection_fd;
-    m_epoll_event_manager.MonitorFd(event.connection_fd, ev);
+    ev.data.fd = io_event.connection_fd;
+    m_epoll_event_manager.MonitorFd(io_event.connection_fd, ev);
     //todo, 是否需要立即进行read
     //...
 }
 
 void IOThread::OnWrite(const WriteEvent &event)
 {
-    m_write_handler.Send(event.packet);
+    if (m_epoll_event_manager.IsFdMonitored(event.connection_fd))
+    {
+        m_write_handler.Send(event.packet);
+    }
 }
 
 void IOThread::OnCloseConnectionRequest(const CloseConnectionRequestEvent &event)
 {
-    close(event.connection_fd);
-    m_read_handler.OnCloseConnection(event.connection_fd);
-    m_write_handler.OnCloseConnection(event.connection_fd);
+    CloseConnection(event.connection_fd);
 }
 
 void IOThread::AcceptIOEvent(IOEvent *event)
@@ -144,12 +145,11 @@ void IOThread::BeforeOutputIOEvent(IOEvent *io_event)
 {
     if (io_event->event_type == IOEvent::EventType::UNEXPECTED_DISCONNECT)
     {
-        close(io_event->connection_fd);
-        m_read_handler.OnCloseConnection(io_event->connection_fd);
-        m_write_handler.OnCloseConnection(io_event->connection_fd);
-        delete io_event;
+        CloseConnection(io_event->connection_fd);
         CloseConnectionCompleteEvent *event = new CloseConnectionCompleteEvent;
+        event->connection_fd = io_event->connection_fd;
         m_output_io_event_pipe(event);
+        delete io_event;
     }
     else if (io_event->event_type == IOEvent::EventType::WRITE_EAGAIN)
     {
@@ -157,9 +157,18 @@ void IOThread::BeforeOutputIOEvent(IOEvent *io_event)
         ev.events = EPOLLOUT | EPOLLET;
         ev.data.fd = io_event->connection_fd;
         m_epoll_event_manager.MonitorFd(io_event->connection_fd, ev);
+        delete io_event;
     }
     else
     {
         m_output_io_event_pipe(io_event);
     }
+}
+
+void IOThread::CloseConnection(int32_t connection_fd)
+{
+    close(connection_fd);
+    m_epoll_event_manager.StopMonitorFd(connection_fd);
+    m_read_handler.OnCloseConnection(connection_fd);
+    m_write_handler.OnCloseConnection(connection_fd);
 }

@@ -144,6 +144,7 @@ bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t da
         return false;
     }
     WriteEvent *event = new WriteEvent;
+    event->connection_fd = connection_fd;
     event->packet = new PacketToSend(connection_fd, data_len);
     memcpy(event->packet->packet_bytes, data_bytes, data_len);
     uint16_t io_thread_id = HashToIoThread(connection_fd);

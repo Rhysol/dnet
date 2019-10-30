@@ -23,34 +23,42 @@ bool WriteHandler::HandleUnfinishedPacket(int32_t connection_fd)
     auto unfinished_queue_iter = m_unfinished_packet.find(connection_fd);
     if (unfinished_queue_iter == m_unfinished_packet.end()) return true;
     std::deque<PacketToSend *> &unfinished_queue = unfinished_queue_iter->second;
+    SendUnfinishedPacket(unfinished_queue);
+    if (unfinished_queue.size() == 0)
+    {
+        m_unfinished_packet.erase(connection_fd);
+        return true;
+    }
+    return false;
+}
+
+void WriteHandler::SendUnfinishedPacket(std::deque<PacketToSend *> &unfinished_queue)
+{
     PacketToSend *packet = nullptr;
+    const char *bytes_to_write = 0;
+    int32_t len_to_write = 0;
+    int32_t write_len = 0;
     while (unfinished_queue.size() != 0)
     {
         packet = unfinished_queue.front();
-        SendUnfinishedPacket(packet);
-        if (packet->packet_offset != packet->packet_len)
+        bytes_to_write = packet->packet_bytes + packet->packet_offset;
+        len_to_write = packet->packet_len - packet->packet_offset;
+        write_len = write(packet->connection_fd, bytes_to_write, len_to_write);
+        if (write_len == -1 && errno != EAGAIN)
         {
-            return false;
+            OnUnexpectedDisconnect(packet->connection_fd);
+            break;
         }
-        unfinished_queue.pop_front();
-        delete packet;
-    }
-    m_unfinished_packet.erase(connection_fd);
-    return true;
-}
-
-void WriteHandler::SendUnfinishedPacket(PacketToSend *packet)
-{
-    const char *bytes_to_write = packet->packet_bytes + packet->packet_offset;
-    int32_t len_to_write = packet->packet_len - packet->packet_offset;
-    int32_t write_len = write(packet->connection_fd, bytes_to_write, len_to_write);
-    if (write_len > 0)
-    {
-        packet->packet_offset += write_len;
-    }
-    else if (write_len == -1 && errno != EAGAIN)
-    {
-        OnUnexpectedDisconnect(packet->connection_fd);
+        else if (len_to_write == write_len)
+        {
+            unfinished_queue.pop_front();
+            delete packet;
+        }
+        else
+        {
+            packet->packet_offset += write_len;
+            break;
+        }
     }
 }
 

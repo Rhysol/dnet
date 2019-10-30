@@ -57,9 +57,11 @@ bool EpollEventManager::MonitorFd(int32_t fd, epoll_event &event)
 
 void EpollEventManager::StopMonitorFd(int32_t fd)
 {
-	if(m_monitoring_fd.find(fd) != m_monitoring_fd.end())
-	{
-		m_monitoring_fd.erase(fd);
-		epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-	}
+	m_monitoring_fd.erase(fd);
+	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+}
+
+bool EpollEventManager::IsFdMonitored(int32_t fd)
+{
+	return m_monitoring_fd.find(fd) != m_monitoring_fd.end();
 }

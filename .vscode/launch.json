@@ -68,7 +68,7 @@
             "miDebuggerPath": "/usr/bin/gdb"
         },
         {
-            "name": "DebugClient",
+            "name": "DebugClientSend",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceRoot}/a.out",
@@ -85,7 +85,7 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build_client_test",
+            "preLaunchTask": "build_client_send_test",
             "miDebuggerPath": "/usr/bin/gdb"
         }
     ]
