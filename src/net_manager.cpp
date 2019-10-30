@@ -104,7 +104,7 @@ void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
     RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
     to_thread_event->connection_fd = event.connection_fd; 
     m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
-    m_net_event_handler->OnNewConnection(event.connection_fd);
+    m_net_event_handler->OnNewConnection(connection->fd, connection->remote_ip, connection->remote_port);
 }
 
 void NetManager::OnRead(const ReadEvent &event)

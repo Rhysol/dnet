@@ -33,7 +33,7 @@ class NetEventInterface
 public:
     //告诉net_manager如何创建NetPacket，使用者自定义
     virtual NetPacketInterface *CreateNetPacket() = 0;
-    virtual void OnNewConnection(int32_t connection_fd) = 0;
+    virtual void OnNewConnection(int32_t connection_fd, const std::string &ip, uint16_t port) = 0;
     virtual void OnReceivePacket(const NetPacketInterface &) = 0;
     virtual void OnDisconnect(int32_t connection_fd) = 0;
 };

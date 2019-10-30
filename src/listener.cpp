@@ -73,7 +73,5 @@ void Listener::OnAccept()
         event->remote_ip = inet_ntoa(client_addr.sin_addr);
         event->remote_port = ntohs(client_addr.sin_port);
         m_output_io_event_pipe(event);
-		std::cout << "accept client, ip[" << event->remote_ip << 
-		"] port[" << event->remote_port << "]" << std::endl; 
 	}
 }

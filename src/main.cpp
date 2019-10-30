@@ -36,8 +36,9 @@ public:
 	{
 		return new NetPacket(512);
 	}
-	virtual void OnNewConnection(int32_t connection_fd) override
+	virtual void OnNewConnection(int32_t connection_fd, const std::string &ip, uint16_t port) override
 	{
+		std::cout << "new connection, ip[" << ip << "] port[" << port << "]" << std::endl;
 		connected_fd.emplace(connection_fd);
 	}
     virtual void OnReceivePacket(const NetPacketInterface &) override
