@@ -86,12 +86,12 @@ int main(int argc, char *argv[])
 	total_send_num = std::atoi(argv[3]);
 	while (net.IsAlive() || handle_count != 0)
 	{
-		// if (SendMessage() == 0)
-		// {
-		// 	net.Stop();
-		//     end = std::chrono::system_clock::now();
-		// 	break;
-		// }
+		if (SendMessage() == 0)
+		{
+			net.Stop();
+		    end = std::chrono::system_clock::now();
+			break;
+		}
 		handle_count = net.Update();
 		handleed_count += handle_count;
 		if (handleed_count >= total_handle_num)

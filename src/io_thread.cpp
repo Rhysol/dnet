@@ -24,7 +24,6 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
     m_output_io_event_pipe = output_event_pipe;
     m_read_handler.Init(create_packet_func, std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
     m_write_handler.Init(std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
-    m_io_events.Init(1);
     return m_epoll_event_manager.Init(std::bind(&IOThread::HandleEpollEvent, this, std::placeholders::_1));
 }
 
@@ -137,7 +136,7 @@ void IOThread::OnCloseConnectionRequest(const CloseConnectionRequestEvent &event
 
 void IOThread::AcceptIOEvent(IOEvent *event)
 {
-    m_io_events.Enqueue(event, 0);
+    m_io_events.Enqueue(event);
 }
 
 void IOThread::BeforeOutputIOEvent(IOEvent *io_event)

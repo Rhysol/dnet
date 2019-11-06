@@ -4,6 +4,7 @@
 #include "read_handler.h"
 #include "write_handler.h"
 #include <set>
+#include "spsc_queue.h"
 
 namespace std {
     class thread;
@@ -51,7 +52,7 @@ protected:
     ReadHandler m_read_handler;
     WriteHandler m_write_handler;
 
-    MPSCQueue<IOEvent> m_io_events;
+    SPSCQueue<IOEvent> m_io_events;
 
     bool m_keep_alive = true;
     timespec m_sleep_duration;

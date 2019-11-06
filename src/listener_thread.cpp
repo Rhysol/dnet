@@ -18,16 +18,6 @@ bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint
     if(!IOThread::Init(thread_id, create_packet_func, output_event_pipe)) return false;
     if (!m_listener.StartListen(listen_ip, listen_port, output_event_pipe)) return false;
 
-    // m_thread_id = thread_id;
-    // m_sleep_interval.tv_sec = 0;
-    // m_sleep_interval.tv_nsec = 1000 * 1000; // 1ms
-    // m_read_handler.Init(create_packet_func, output_event_pipe);
-    // if (!m_epoll_event_manager.Init(std::bind(&ListenerThread::HandleEpollEvent, this, std::placeholders::_1)))
-    // { 
-    //     std::cout << "listener epoll init failed" << std::endl;
-    //     return false;
-    // }
-
     //把listener_fd注册到epoll
     epoll_event ev;
     memset(&ev, 0, sizeof(ev));
