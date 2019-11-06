@@ -54,6 +54,6 @@ protected:
 
     SPSCQueue<IOEvent> m_io_events;
 
-    bool m_keep_alive = true;
+    std::atomic<bool> m_keep_alive;
     timespec m_sleep_duration;
 };

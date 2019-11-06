@@ -20,6 +20,7 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
     m_thread_id = thread_id;
     m_sleep_duration.tv_sec = 0;
     m_sleep_duration.tv_nsec = 1000 * global_config.io_thread_sleep_duration; // 1ms
+    m_keep_alive.store(true, std::memory_order_release);
 
     m_output_io_event_pipe = output_event_pipe;
     m_read_handler.Init(create_packet_func, std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
@@ -34,7 +35,7 @@ void IOThread::Start()
 
 void IOThread::Stop()
 {
-    m_keep_alive = false;
+    m_keep_alive.store(false, std::memory_order_release);
 }
 
 void IOThread::Join()
@@ -47,7 +48,7 @@ void IOThread::Join()
 
 void IOThread::Update()
 {
-    while(m_keep_alive)
+    while(m_keep_alive.load())
     {
         HandleIOEvent();
 
