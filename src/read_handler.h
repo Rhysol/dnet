@@ -16,7 +16,7 @@ struct ReadBuffer
         return global_config.read_buffer_size;
     }
     char *buffer;
-    uint32_t buffer_len = 0;
+    int32_t buffer_len = 0;
 };
 
 class ReadHandler

@@ -100,6 +100,7 @@ struct PacketToSend
         to_move.packet_bytes = nullptr;
         to_move.packet_len = 0;
         to_move.packet_offset = 0;
+        return *this;
     }
     int32_t connection_fd;
     char *packet_bytes;

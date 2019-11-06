@@ -8,6 +8,9 @@ include_directories(${PROJECT_SOURCE_DIR}/src)
 link_directories(${PROJECT_SOURCE_DIR})
 
 set (CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 add_library(obj_net OBJECT src/listener.cpp src/connection_manager.cpp src/epoll_event_manager.cpp
 src/read_handler.cpp src/write_handler.cpp src/io_thread.cpp src/listener_thread.cpp src/net_manager.cpp)

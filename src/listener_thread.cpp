@@ -28,6 +28,7 @@ bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint
         std::cout << "register listen event to epoll failed!" << std::endl;
         return false;
     }
+    return true;
 }
 
 void ListenerThread::HandleEpollEvent(const epoll_event &ev)
