@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <iostream>
 #include <unistd.h>
+#include "logger.h"
 
 const Connection *ConnectionManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
 {
@@ -12,7 +13,7 @@ const Connection *ConnectionManager::ConnectTo(const std::string &remote_ip, uin
     remote_addr.sin_family = AF_INET;
     if (inet_aton(remote_ip.c_str(), &remote_addr.sin_addr) == 0)
     {
-        std::cout << "ip[" << remote_ip << "] is invalid!" << std::endl;
+        LOGE("ip:{} is invalid!", remote_ip);
         return nullptr;
     }
     remote_addr.sin_port = htons(remote_port);
@@ -20,13 +21,13 @@ const Connection *ConnectionManager::ConnectTo(const std::string &remote_ip, uin
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (connect(fd, (sockaddr *)&remote_addr, sizeof(sockaddr)) == -1)
     {
-        std::cout << "connect to[" << remote_ip << ":" << remote_port << "] failed! errno[" << errno << "]" << std::endl;
+        LOGE("connect to: {}:{} failed! errno: {}", remote_ip, remote_port, errno);
         return nullptr;
     }
 
     if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) == -1)
     {
-        std::cout << "set to nonblock failed! errno[" << errno << "]" << std::endl;
+        LOGE("set to nonblock failed! errno: {}", errno);
         return nullptr;
     }
 
@@ -44,7 +45,7 @@ void ConnectionManager::HandleDuplicatedFd(int32_t fd)
     auto iter = m_connections.find(fd);
     if (iter != m_connections.end())
     {
-        std::cout << "Duplicated fd[" << fd << "] in manager" << std::endl;
+        LOGW("Duplicated fd: {} in manager", fd);
     }
 }
 

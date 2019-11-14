@@ -1,5 +1,6 @@
 #include "listener_thread.h"
 #include <cstring>
+#include "logger.h"
 
 
 ListenerThread::ListenerThread()
@@ -25,7 +26,7 @@ bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint
     ev.data.fd = m_listener.GetListenerFd();
     if (!m_epoll_event_manager.MonitorFd(m_listener.GetListenerFd(), ev))
     {
-        std::cout << "register listen event to epoll failed!" << std::endl;
+        LOGE("register listen event to epoll failed!");
         return false;
     }
     return true;

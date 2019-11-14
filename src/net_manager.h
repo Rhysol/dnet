@@ -26,6 +26,7 @@ public:
     void CloseConnection(int32_t connection_fd);
 
 private:
+    void InitLogger();
     void InitThreads(const std::string &listen_ip, uint16_t listen_port);
 
     uint16_t HashToIoThread(int32_t connection_fd);

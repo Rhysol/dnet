@@ -1,5 +1,6 @@
 #include "io_thread.h"
 #include <thread>
+#include "logger.h"
 
 
 IOThread::IOThread()
@@ -61,7 +62,7 @@ void IOThread::Update()
     {
 
     }
-    std::cout << "thread:" << m_thread_id << " stoped" << std::endl;
+    LOGI("thread: {} stopped!", m_thread_id);
 }
 
 void IOThread::HandleEpollEvent(const epoll_event &ev)
@@ -101,7 +102,7 @@ uint32_t IOThread::HandleIOEvent()
             OnCloseConnectionRequest((CloseConnectionRequestEvent &)(*event));
             break;
         default:
-            { std::cout << "unkown event type:" << event->event_type << std::endl; }
+            { LOGE("unkown event type: {}", (int16_t)event->event_type); }    
             break;
         }
         delete event;//由io_event_pipe创建

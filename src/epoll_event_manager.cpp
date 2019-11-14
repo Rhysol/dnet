@@ -1,5 +1,6 @@
 #include "epoll_event_manager.h"
 #include "net_config.h"
+#include "logger.h"
 
 EpollEventManager::EpollEventManager()
 {
@@ -28,7 +29,7 @@ uint32_t EpollEventManager::Update()
 	int event_num = epoll_wait(m_epoll_fd, m_events, global_config.epoll_max_event_num, 0);
 	if (event_num == -1)
 	{
-		std::cout << "epoll_wait failed" << std::endl;
+		LOGE("epoll_wait failed!");
 		return 0;
 	}
 	for (int i = 0; i < event_num; i++)
@@ -49,7 +50,7 @@ bool EpollEventManager::MonitorFd(int32_t fd, epoll_event &event)
 
 	if (epoll_ctl(m_epoll_fd, operation, fd, &event) != 0)
 	{
-		std::cout << "epoll_ctl failed! operation[" << operation << "], errno[" << errno << "]" << std::endl;
+		LOGE("epoll_ctl failed! operation: {}, errno: {}", operation, errno);
 		return false;
 	}
 	return true;

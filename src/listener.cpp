@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <cstring>
 #include "net_config.h"
+#include "logger.h"
 
 uint16_t Listener::listen_queue_max_count = 1000;
 
@@ -34,23 +35,23 @@ bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port, c
 	server_addr.sin_port = htons(m_listen_port);
 	if (inet_aton(m_listen_ip.c_str(), &server_addr.sin_addr) == 0)
 	{
-		std::cout << "bind address is invalid" << std::endl;
+		LOGE("bind address is invalid");
 		return false;
 	}
 	m_listener_fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
 	if (m_listener_fd == -1)
 	{
-		std::cout << "create listen socket failed" << std::endl;
+		LOGE("create listen socket failed");
 		return false;
 	}
 	if (bind(m_listener_fd, (sockaddr *)&server_addr, sizeof(sockaddr)) == -1)
 	{
-		std::cout << "bind listener fd failed" << std::endl;
+		LOGE("bind listener fd failed");
 		return false;
 	}
 	if (listen(m_listener_fd, global_config.listen_queue_max_num) == -1)
 	{
-		std::cout << "listen failed" << std::endl;
+		LOGE("listen failed!");
 		return false;
 	}
 
@@ -65,7 +66,7 @@ void Listener::OnAccept()
 	int client_fd = accept4(m_listener_fd, (sockaddr *)&client_addr, &len, SOCK_NONBLOCK | SOCK_CLOEXEC);
 	if (client_fd == -1)
 	{
-		std::cout << "accept client failed! errno[" << errno << "]" << std::endl;
+		LOGW("accept client failed! errno: {}", errno);
 	}
 	else
 	{

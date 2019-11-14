@@ -9,3 +9,5 @@ Makefile
 libnet.a
 libnet.so
 server
+build
+build/*

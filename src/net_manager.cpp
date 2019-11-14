@@ -2,8 +2,12 @@
 #include "listener_thread.h"
 #include <cstring>
 #include "net_config.h"
+#include "logger.h"
+#include <spdlog/sinks/hourly_file_sink.h>
+#include <spdlog/async.h>
 
 NetConfig global_config;
+std::shared_ptr<spdlog::logger> net_logger;
 
 NetManager::NetManager()
 {
@@ -23,11 +27,17 @@ NetManager::~NetManager()
 bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
 {
     if (net_hander == nullptr) return false;
+    InitLogger();
     global_config = config;
     m_net_event_handler = net_hander;
     m_events_queue.Init(global_config.io_thread_num),
     InitThreads(global_config.listen_ip, global_config.listen_port);
     return true;
+}
+
+void NetManager::InitLogger()
+{
+    net_logger = spdlog::hourly_logger_mt<spdlog::async_factory>("net_logger", "log/netlog");
 }
 
 void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
@@ -62,7 +72,7 @@ void NetManager::Stop()
         thread->Join();
     }
     m_keep_alive = false;
-    std::cout << "io thread stoped" << std::endl;
+    LOGI("io thread stoped");
 }
 
 uint32_t NetManager::Update()
@@ -83,7 +93,7 @@ uint32_t NetManager::Update()
             OnCloseConnectionComplete((CloseConnectionCompleteEvent &)(*event));
             break;
         default:
-            { std::cout << "unkown event type" << std::endl; }
+            { LOGE("unkown event type{}", (int16_t)event->event_type); }
             break;
         }
         delete event;//由io_event_pipe创建
@@ -135,12 +145,12 @@ bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t da
 {
     if (data_len == 0)
     {
-        std::cout << "send data length is 0" << std::endl;
+        LOGW("fd: {} send data length is 0", connection_fd);
         return false;
     }
     if (m_connection_manager.GetConnection(connection_fd) == nullptr)
     {
-        std::cout << "invalid connection_fd:" << connection_fd << std::endl;
+        LOGE("invalid connection_fd: {}", connection_fd);
         return false;
     }
     WriteEvent *event = new WriteEvent;

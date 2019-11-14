@@ -3,6 +3,7 @@
 #include <cstring>
 #include <unistd.h>
 #include "net_config.h"
+#include "logger.h"
 
 WriteHandler::WriteHandler()
 {
@@ -97,7 +98,7 @@ void WriteHandler::OnUnfinishedPacket(PacketToSend *packet)
     //积压超过一定数量就断开链接
     if (unfinished_packet.size() > global_config.max_unfinished_send_packet)
     {
-        std::cout << "fd:" << packet->connection_fd << " unsended packet more than 10, close connection!" << std::endl;
+        LOGW("fd: {} unsended packet more than 10, close connection!", packet->connection_fd);
         OnUnexpectedDisconnect(packet->connection_fd);
     }
 }

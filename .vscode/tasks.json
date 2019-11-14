@@ -2,30 +2,35 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "make_build_dir",
+            "type": "shell",
+            "command": "mkdir -p build",
+        },
+        {
             "label": "cmake_debug",
             "type": "shell",
-            "command": "cmake",
-            "args": ["-DCMAKE_BUILD_TYPE=Debug", "."]
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Debug .."
         },
         {
             "label": "cmake_release",
             "type": "shell",
-            "command": "cmake",
-            "args": ["-DCMAKE_BUILD_TYPE=Debug", "."]
+            "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Release .."
         },
         {
             "label": "make",
             "type": "shell",
-            "command": "make",
+            "command": "cd build && make",
             "args": []
         },
         {
             "label": "build_debug",
-            "dependsOn": ["cmake_debug", "make"]
+            "dependsOrder": "sequence",
+            "dependsOn": ["make_build_dir", "cmake_debug", "make"]
         },
         {
             "label": "build_release",
-            "dependsOn": ["cmake_release", "make"]
+            "dependsOrder": "sequence",
+            "dependsOn": ["make_build_dir", "cmake_release", "make"]
         },
         {
             "label": "build_mpsc_test",

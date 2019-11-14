@@ -4,8 +4,8 @@ project (net_lib)
 set (NET_LIB_VERSION_MAJOR 1)
 set (NET_LIB_VERSION_MINOR 0)
 
-include_directories(${PROJECT_SOURCE_DIR}/src)
-link_directories(${PROJECT_SOURCE_DIR})
+include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/third_part)
+link_directories(${PROJECT_SOURCE_DIR}/lib)
 
 set (CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS "-Wall -Wextra")
@@ -24,4 +24,4 @@ add_library(net_static STATIC $<TARGET_OBJECTS:obj_net>)
 set_target_properties(net_static PROPERTIES OUTPUT_NAME net)
 
 add_executable(server test/main.cpp)
-target_link_libraries(server net profiler tcmalloc)
+target_link_libraries(server net spdlog profiler tcmalloc)

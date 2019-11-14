@@ -1,6 +1,7 @@
 #include "../src/connection_manager.h"
 #include <iostream>
 #include <unistd.h>
+#include "../src/logger.h"
 
 int32_t DoRead(const Connection &client)
 {
@@ -8,7 +9,7 @@ int32_t DoRead(const Connection &client)
     int32_t read_num = read(client.fd, buffer, 1024);
     if (read_num > 0)
     {
-        std::cout << "read_num[" << read_num << "]" << std::endl;
+        std::cout << "read_num:" << read_num << std::endl; 
     }
     if (read_num == 0)
     {

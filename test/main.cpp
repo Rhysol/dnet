@@ -5,6 +5,7 @@
 #include <set>
 #include <vector>
 #include "../src/net_manager.h"
+#include "../src/logger.h"
 
 
 void WaitAWhile()
@@ -37,7 +38,7 @@ public:
 	}
 	virtual void OnNewConnection(int32_t connection_fd, const std::string &ip, uint16_t port) override
 	{
-		std::cout << "new connection, ip[" << ip << "] port[" << port << "]" << std::endl;
+		LOGI("new connection, ip: {}:{}", ip, port);
 		connected_fd.emplace(connection_fd);
 	}
     virtual void OnReceivePacket(const NetPacketInterface &) override
@@ -46,7 +47,7 @@ public:
 	}
     virtual void OnDisconnect(int32_t connection_fd) override
 	{
-		std::cout << "connection: " << connection_fd << " disconnect" << std::endl;
+		LOGI("connection: {} disconnect", connection_fd);
 		connected_fd.erase(connection_fd);
 	}
 };
@@ -107,5 +108,5 @@ int main(int argc, char *argv[])
 	do {
 		handle_count = net.Update();
 	} while(handle_count != 0);
-	std::cout << "cost time:" << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << std::endl;
+	LOGI("cost time: {}", std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
 }

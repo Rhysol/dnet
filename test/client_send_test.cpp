@@ -14,14 +14,14 @@ void DoSend(const Connection &client)
     }
     else if (write_num == -1)
     {
-        std::cout << "errno[" << errno << "]" << std::endl;
+        std::cout << "errno[" << errno << "]" << std::endl; 
     }
     else
     {
         --count;
     }
     
-	std::cout << "write_num[" << write_num << "]" << std::endl;
+	std::cout <<"write_num[" << write_num << "]" << std::endl; 
 }
 
 void WaitAWhile()

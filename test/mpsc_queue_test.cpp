@@ -82,13 +82,13 @@ int main(int agrc, char *argv[])
     {
         thread.join();
     }
-    std::cout << "dequeue_num:" << thread_num * thread_enqueue_num << " cost:" << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << std::endl;
+    std::cout <<  "dequeue_num:" << thread_num * thread_enqueue_num << " cost:" << std::chrono::duration_cast<std::chrono::milliseconds>(end-start).count() << std::endl;
     std::stringstream ss;
     uint32_t total = 0;
     for (uint16_t i = 0; i < thread_num; i++)
     {
         total += thread_cost_time[i];
-        std::cout << "thread:" << i << " enqueue_num:" << thread_enqueue_num << " cost:" << thread_cost_time[i] << std::endl;
+        std::cout << "thread:" << i << " enqueue_num:" << thread_enqueue_num << " cost:" << thread_cost_time[i] << std::endl; 
     }
-    std::cout << "enqueue average cost:" << total/thread_num << std::endl;
+    std::cout << "enqueue average cost:" << total/thread_num << std::endl; 
 }
