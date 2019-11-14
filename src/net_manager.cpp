@@ -79,6 +79,7 @@ uint32_t NetManager::Update()
 {
     IOEvent *event = m_events_queue.Dequeue();
     uint16_t handle_count = 0;
+    LOGI("update");
     while (event != nullptr)
     {
         switch (event->event_type)
