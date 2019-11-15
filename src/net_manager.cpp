@@ -37,7 +37,7 @@ bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
 
 void NetManager::InitLogger()
 {
-    net_logger = spdlog::hourly_logger_mt<spdlog::async_factory>("net_logger", "log/netlog");
+    net_logger = spdlog::hourly_logger_mt<spdlog::async_factory>("net_logger", "log/net.log");
 }
 
 void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
@@ -79,7 +79,6 @@ uint32_t NetManager::Update()
 {
     IOEvent *event = m_events_queue.Dequeue();
     uint16_t handle_count = 0;
-    LOGI("update");
     while (event != nullptr)
     {
         switch (event->event_type)
