@@ -7,6 +7,11 @@
             "command": "mkdir -p build",
         },
         {
+            "label": "generate_clangd_file",
+            "type": "shell",
+            "command": "cd build && cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1 .."
+        },
+        {
             "label": "cmake_debug",
             "type": "shell",
             "command": "cd build && cmake -DCMAKE_BUILD_TYPE=Debug .."
@@ -25,7 +30,7 @@
         {
             "label": "build_debug",
             "dependsOrder": "sequence",
-            "dependsOn": ["make_build_dir", "cmake_debug", "make"]
+            "dependsOn": ["make_build_dir", "generate_clangd_file", "cmake_debug", "make"]
         },
         {
             "label": "build_release",

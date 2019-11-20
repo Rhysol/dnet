@@ -11,3 +11,6 @@ libnet.so
 server
 build
 build/*
+compile_commands.json
+.clangd
+.clangd/*
