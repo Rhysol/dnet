@@ -1,0 +1,46 @@
+﻿{
+  "configurations": [
+    {
+      "name": "Linux-Clang-Debug",
+      "generator": "Unix Makefiles",
+      "configurationType": "Debug",
+      "cmakeExecutable": "/usr/bin/cmake",
+      "remoteCopySourcesExclusionList": [ ".vs", ".git", "out" ],
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-j 6",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "linux_clang_x64" ],
+      "remoteMachineName": "${env.LocalVM}",
+      "remoteCMakeListsRoot": "$HOME/.vs/${projectDirName}/src",
+      "remoteBuildRoot": "$HOME/.vs/${projectDirName}/build/${name}",
+      "remoteInstallRoot": "$HOME/.vs/${projectDirName}/install/${name}",
+      "remoteCopySources": true,
+      "rsyncCommandArgs": "-t --delete --delete-excluded",
+      "remoteCopyBuildOutput": false,
+      "remoteCopySourcesMethod": "rsync",
+      "addressSanitizerRuntimeFlags": "detect_leaks=0",
+      "variables": []
+    },
+    {
+      "name": "Linux-Debug",
+      "generator": "Unix Makefiles",
+      "configurationType": "Debug",
+      "cmakeExecutable": "/usr/bin/cmake",
+      "remoteCopySourcesExclusionList": [ ".vs", ".git", "out" ],
+      "cmakeCommandArgs": "",
+      "buildCommandArgs": "-j 6",
+      "ctestCommandArgs": "",
+      "inheritEnvironments": [ "linux_x64" ],
+      "remoteMachineName": "${env.LocalVM}",
+      "remoteCMakeListsRoot": "$HOME/.vs/${projectDirName}/src",
+      "remoteBuildRoot": "$HOME/.vs/${projectDirName}/build/${name}",
+      "remoteInstallRoot": "$HOME/.vs/${projectDirName}/install/${name}",
+      "remoteCopySources": true,
+      "rsyncCommandArgs": "-t --delete --delete-excluded",
+      "remoteCopyBuildOutput": false,
+      "remoteCopySourcesMethod": "rsync",
+      "addressSanitizerRuntimeFlags": "detect_leaks=0",
+      "variables": []
+    }
+  ]
+}
