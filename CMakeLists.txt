@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.17)
 
-project(dnet)
+project(lib_dnet)
 
 set(CMAKE_CXX_STANDARD 11)
 

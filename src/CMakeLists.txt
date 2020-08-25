@@ -1,6 +1,4 @@
-project(lib_dnet)
-
-add_library(dnet_objs OBJECT
+add_library(dnet
 	connection_manager.cpp
 	connection_manager.h
 	epoll_event_manager.cpp
@@ -25,17 +23,15 @@ add_library(dnet_objs OBJECT
 	write_handler.h
 )
 
-target_include_directories(dnet_objs
+target_include_directories(dnet
 	PUBLIC ../third_part
 )
 
-target_link_libraries(dnet_objs
-	PRIVATE ../lib
+target_link_directories(dnet
+	PUBLIC ../lib
 )
 
-target_link_libraries(dnet_objs
+target_link_libraries(dnet
 	PUBLIC pthread
-	PRIVATE spdlog
+	PUBLIC spdlog
 )
-
-add_library(dnet $<TARGET_OBJECTS:dnet_objs>)
