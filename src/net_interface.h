@@ -1,6 +1,8 @@
 #pragma once
 #include <functional>
 
+namespace dnet
+{
 
 class NetPacketInterface
 {
@@ -37,3 +39,5 @@ public:
     virtual void OnReceivePacket(const NetPacketInterface &) = 0;
     virtual void OnDisconnect(int32_t connection_fd) = 0;
 };
+
+}

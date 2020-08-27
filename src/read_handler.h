@@ -3,6 +3,8 @@
 #include <unordered_map>
 #include "net_config.h"
 
+namespace dnet
+{
 
 struct ReadBuffer
 {
@@ -49,3 +51,5 @@ private:
     ReadBuffer m_read_buffer;
     std::unordered_map<int32_t, ReadEvent *> m_unfinished_read; //key:connection_fd
 };
+
+}

@@ -7,6 +7,7 @@
 #include "../src/net_manager.h"
 #include "../src/logger.h"
 
+using namespace dnet;
 
 void WaitAWhile()
 {

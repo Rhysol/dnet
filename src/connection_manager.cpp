@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include "logger.h"
 
+using namespace dnet;
+
 const Connection *ConnectionManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
 {
     sockaddr_in remote_addr;

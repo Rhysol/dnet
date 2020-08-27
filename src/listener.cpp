@@ -7,6 +7,8 @@
 #include "net_config.h"
 #include "logger.h"
 
+using namespace dnet;
+
 uint16_t Listener::listen_queue_max_count = 1000;
 
 Listener::Listener()

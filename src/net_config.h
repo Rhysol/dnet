@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <string>
 
+namespace dnet
+{
+
 struct NetConfig
 {
     //****************************************************************//
@@ -32,3 +35,5 @@ struct NetConfig
 };
 
 extern NetConfig global_config;
+
+}

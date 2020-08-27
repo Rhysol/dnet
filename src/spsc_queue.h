@@ -1,6 +1,9 @@
 #pragma once
 #include <atomic>
 
+namespace dnet
+{
+	
 template <typename T>
 class SPSCQueue
 {
@@ -55,3 +58,5 @@ private:
 	Node *m_head = nullptr;
 	Node *m_tail = nullptr;
 };
+
+}

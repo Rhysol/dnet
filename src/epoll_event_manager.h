@@ -6,6 +6,8 @@
 #include <functional>
 #include <set>
 
+namespace dnet
+{
 
 class EpollEventManager
 {
@@ -32,3 +34,5 @@ private:
 	HandleEventFunc m_handle_event_func;
 	std::set<int32_t> m_monitoring_fd;
 };
+
+}

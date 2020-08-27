@@ -2,6 +2,7 @@
 #include <cstring>
 #include "logger.h"
 
+using namespace dnet;
 
 ListenerThread::ListenerThread()
 {

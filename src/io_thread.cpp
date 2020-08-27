@@ -2,6 +2,7 @@
 #include <thread>
 #include "logger.h"
 
+using namespace dnet;
 
 IOThread::IOThread()
 {

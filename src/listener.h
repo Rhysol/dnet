@@ -6,6 +6,9 @@
 #include "epoll_event_manager.h"
 #include "io_event.h"
 
+namespace dnet
+{
+
 class Listener 
 {
 public:
@@ -27,3 +30,5 @@ private:
 	uint16_t m_listen_port;
 	int32_t m_listener_fd = -1;
 };
+
+}

@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <cstring>
 
+using namespace dnet;
 
 ReadHandler::ReadHandler()
 {

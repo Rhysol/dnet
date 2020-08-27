@@ -6,8 +6,10 @@
 #include <spdlog/sinks/hourly_file_sink.h>
 #include <spdlog/async.h>
 
-NetConfig global_config;
-std::shared_ptr<spdlog::logger> net_logger;
+using namespace dnet;
+
+NetConfig dnet::global_config;
+std::shared_ptr<spdlog::logger> dnet::net_logger;
 
 NetManager::NetManager()
 {

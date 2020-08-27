@@ -2,6 +2,8 @@
 #include "io_thread.h"
 #include "listener.h"
 
+namespace dnet
+{
 
 class ListenerThread : public IOThread
 {
@@ -19,3 +21,5 @@ private:
 private:
     Listener m_listener;
 };
+
+}

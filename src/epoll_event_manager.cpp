@@ -2,6 +2,8 @@
 #include "net_config.h"
 #include "logger.h"
 
+using namespace dnet;
+
 EpollEventManager::EpollEventManager()
 {
 }

@@ -1,6 +1,9 @@
 #pragma once
 #include "net_interface.h"
 
+namespace dnet
+{
+
 struct IOEvent
 {
     enum EventType 
@@ -137,3 +140,5 @@ struct WriteEagainEvent : public IOEvent
 };
 
 typedef std::function<void (IOEvent *event)> OutputIOEventPipe;
+
+}

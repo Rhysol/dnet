@@ -3,6 +3,9 @@
 #include <string>
 #include <unordered_map>
 
+namespace dnet
+{
+
 //一个tcp物理链接
 struct Connection
 {
@@ -29,3 +32,5 @@ private:
 private:
     std::unordered_map<int32_t, Connection> m_connections;
 };
+
+}

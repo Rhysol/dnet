@@ -10,6 +10,9 @@ namespace std {
     class thread;
 }
 
+namespace dnet
+{
+
 struct IOEvent;
 
 
@@ -57,3 +60,5 @@ protected:
     std::atomic<bool> m_keep_alive;
     timespec m_sleep_duration;
 };
+
+}

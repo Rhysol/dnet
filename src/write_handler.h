@@ -4,6 +4,8 @@
 #include <unordered_map>
 #include <deque>
 
+namespace dnet
+{
 
 class WriteHandler
 {
@@ -32,3 +34,5 @@ private:
 
     std::unordered_map<int32_t, std::deque<PacketToSend *>> m_unfinished_packet;
 };
+
+}

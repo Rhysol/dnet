@@ -5,6 +5,8 @@
 #include "io_event.h"
 #include "net_config.h"
 
+namespace dnet
+{
 
 class IOThread;
 class ListenerThread;
@@ -50,3 +52,5 @@ private:
 
     bool m_keep_alive = true;
 };
+
+}

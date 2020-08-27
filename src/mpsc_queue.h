@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <x86intrin.h>
 
+namespace dnet
+{
 
 const static uint64_t MAX_UINT = -1;
 
@@ -100,3 +102,5 @@ private:
 	Node **m_tails = nullptr;
 	uint16_t m_thread_num = 0;
 };
+
+}
