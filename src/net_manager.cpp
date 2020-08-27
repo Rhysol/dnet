@@ -30,10 +30,10 @@ bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
 {
     if (net_hander == nullptr) return false;
     InitLogger();
-    global_config = config;
+    m_net_config = config;
     m_net_event_handler = net_hander;
-    m_events_queue.Init(global_config.io_thread_num),
-    InitThreads(global_config.listen_ip, global_config.listen_port);
+    m_events_queue.Init(m_net_config.io_thread_num),
+    InitThreads();
     return true;
 }
 
@@ -42,16 +42,16 @@ void NetManager::InitLogger()
     net_logger = spdlog::hourly_logger_mt<spdlog::async_factory>("net_logger", "log/net.log");
 }
 
-void NetManager::InitThreads(const std::string &listen_ip, uint16_t listen_port)
+void NetManager::InitThreads()
 {
     m_io_threads.push_back(new ListenerThread);
     m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
-    m_listener_thread->Init(0, listen_ip, listen_port, 
+    m_listener_thread->Init(0, &m_net_config, 
         std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler),
         std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, 0));
     
     IOThread *io_thread = nullptr;
-    for (uint16_t i = 1; i < global_config.io_thread_num; i++)
+    for (uint16_t i = 1; i < m_net_config.io_thread_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
@@ -100,7 +100,7 @@ uint32_t NetManager::Update()
         }
         delete event;//由io_event_pipe创建
         ++handle_count;
-        if (handle_count >= global_config.net_manager_handle_io_event_num_of_one_update) break;
+        if (handle_count >= m_net_config.net_manager_handle_io_event_num_of_one_update) break;
         event = m_events_queue.Dequeue();
     }
     return handle_count;
@@ -179,7 +179,7 @@ void NetManager::AcceptIOEvent(IOEvent *event, uint16_t thread_id)
 
 uint16_t NetManager::HashToIoThread(int32_t connection_fd)
 {
-    uint16_t thread_id = connection_fd % (int32_t)global_config.io_thread_num;
+    uint16_t thread_id = connection_fd % (int32_t)m_net_config.io_thread_num;
     return thread_id;
 }
 

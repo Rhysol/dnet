@@ -14,11 +14,11 @@ ListenerThread::~ListenerThread()
 
 }
 
-bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint16_t listen_port,
+bool ListenerThread::Init(uint16_t thread_id, const NetConfig *net_config,
     const ReadHandler::CreateNetPacketFunc &create_packet_func, const OutputIOEventPipe &output_event_pipe) 
 {
     if(!IOThread::Init(thread_id, create_packet_func, output_event_pipe)) return false;
-    if (!m_listener.StartListen(listen_ip, listen_port, output_event_pipe)) return false;
+    if (!m_listener.StartListen(net_config, output_event_pipe)) return false;
 
     //把listener_fd注册到epoll
     epoll_event ev;

@@ -29,7 +29,7 @@ public:
 
 private:
     void InitLogger();
-    void InitThreads(const std::string &listen_ip, uint16_t listen_port);
+    void InitThreads();
 
     uint16_t HashToIoThread(int32_t connection_fd);
     void AcceptIOEvent(IOEvent *event, uint16_t thread_id);
@@ -41,6 +41,7 @@ private:
     void CloseAllConnections();
 
 private:
+    NetConfig m_net_config;
     ListenerThread *m_listener_thread;
     std::vector<IOThread *> m_io_threads;
 

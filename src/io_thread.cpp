@@ -21,7 +21,7 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
 {
     m_thread_id = thread_id;
     m_sleep_duration.tv_sec = 0;
-    m_sleep_duration.tv_nsec = 1000 * global_config.io_thread_sleep_duration; // 1ms
+    m_sleep_duration.tv_nsec = 1000 * m_net_config.io_thread_sleep_duration; // 1ms
     m_keep_alive.store(true, std::memory_order_release);
 
     m_output_io_event_pipe = output_event_pipe;
@@ -29,7 +29,7 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
     m_write_handler.Init(std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
 
 	m_epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	m_events = new epoll_event[global_config.epoll_max_event_num];
+	m_events = new epoll_event[m_net_config.epoll_max_event_num];
 	return true;
 }
 
@@ -57,7 +57,7 @@ void IOThread::Update()
     while(m_keep_alive.load())
     {
         HandleIOEvent();
-		epoll_event_num = epoll_wait(m_epoll_fd, m_events, global_config.epoll_max_event_num, 0);
+		epoll_event_num = epoll_wait(m_epoll_fd, m_events, m_net_config.epoll_max_event_num, 0);
 		if (epoll_event_num == -1)
 		{
 			LOGE("epoll_wait failed!");
@@ -150,7 +150,7 @@ uint32_t IOThread::HandleIOEvent()
         }
         delete event;//由io_event_pipe创建
         ++handle_count;
-        if (handle_count >= global_config.io_thread_handle_io_event_num_of_one_update) break;
+        if (handle_count >= m_net_config.io_thread_handle_io_event_num_of_one_update) break;
         event = m_io_events.Dequeue();
     }
     return handle_count;

@@ -9,8 +9,6 @@
 
 using namespace dnet;
 
-uint16_t Listener::listen_queue_max_count = 1000;
-
 Listener::Listener()
 {
 }
@@ -23,19 +21,18 @@ Listener::~Listener()
 	}
 }
 
-bool Listener::StartListen(const std::string &listen_ip, uint16_t listen_port, const OutputIOEventPipe &output_event_pipe)
+bool Listener::StartListen(const NetConfig *net_config, const OutputIOEventPipe &output_event_pipe)
 {
 	if (m_listener_fd != -1) return true;
 
     m_output_io_event_pipe = output_event_pipe;
 
-	m_listen_ip = listen_ip;
-	m_listen_port = listen_port;
+	m_net_config = net_config;
 	sockaddr_in server_addr;
 	memset(&server_addr, 0, sizeof(sockaddr_in));
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_port = htons(m_listen_port);
-	if (inet_aton(m_listen_ip.c_str(), &server_addr.sin_addr) == 0)
+	server_addr.sin_port = htons(m_net_config->listen_port);
+	if (inet_aton(m_net_config->listen_ip.c_str(), &server_addr.sin_addr) == 0)
 	{
 		LOGE("bind address is invalid");
 		return false;
