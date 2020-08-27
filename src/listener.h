@@ -3,7 +3,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include "epoll_event_manager.h"
 #include "io_event.h"
 
 namespace dnet

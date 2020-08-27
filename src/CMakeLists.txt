@@ -1,8 +1,6 @@
 add_library(dnet
 	connection_manager.cpp
 	connection_manager.h
-	epoll_event_manager.cpp
-	epoll_event_manager.h
 	io_event.h
 	io_thread.cpp
 	io_thread.h

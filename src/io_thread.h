@@ -1,6 +1,6 @@
 #pragma once
+#include <sys/epoll.h>
 #include <time.h>
-#include "epoll_event_manager.h"
 #include "read_handler.h"
 #include "write_handler.h"
 #include <set>
@@ -45,11 +45,20 @@ protected:
     void BeforeOutputIOEvent(IOEvent *io_event);
     void CloseConnection(int32_t connection_fd);
 
+	//使epoll监听fd的事件，如果fd已经被监听，则更新监听事件
+	bool MonitorFd(int32_t fd, epoll_event &event);
+	//将fd从epoll的监听列表中移除
+	void StopMonitorFd(int32_t fd);
+	bool IsFdMonitored(int32_t fd);
+
 protected:
     uint16_t m_thread_id;
     std::thread *m_thread = nullptr;
 
-    EpollEventManager m_epoll_event_manager;
+	int m_epoll_fd;
+	epoll_event *m_events = nullptr;
+	std::set<int32_t> m_monitoring_fd;
+
     OutputIOEventPipe m_output_io_event_pipe;
 
     ReadHandler m_read_handler;

@@ -25,7 +25,7 @@ bool ListenerThread::Init(uint16_t thread_id, const std::string &listen_ip, uint
     memset(&ev, 0, sizeof(ev));
     ev.events = EPOLLIN;
     ev.data.fd = m_listener.GetListenerFd();
-    if (!m_epoll_event_manager.MonitorFd(m_listener.GetListenerFd(), ev))
+    if (!MonitorFd(m_listener.GetListenerFd(), ev))
     {
         LOGE("register listen event to epoll failed!");
         return false;

@@ -27,7 +27,10 @@ bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &
     m_output_io_event_pipe = output_event_pipe;
     m_read_handler.Init(create_packet_func, std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
     m_write_handler.Init(std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
-    return m_epoll_event_manager.Init(std::bind(&IOThread::HandleEpollEvent, this, std::placeholders::_1));
+
+	m_epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+	m_events = new epoll_event[global_config.epoll_max_event_num];
+	return true;
 }
 
 void IOThread::Start()
@@ -50,14 +53,25 @@ void IOThread::Join()
 
 void IOThread::Update()
 {
+    int epoll_event_num = 0;
     while(m_keep_alive.load())
     {
         HandleIOEvent();
-
-        if(m_epoll_event_manager.Update() == 0)
+		epoll_event_num = epoll_wait(m_epoll_fd, m_events, global_config.epoll_max_event_num, 0);
+		if (epoll_event_num == -1)
+		{
+			LOGE("epoll_wait failed!");
+            break;
+		}
+        else if (epoll_event_num == 0)
         {
             nanosleep(&m_sleep_duration, NULL);
+            continue;
         }
+		for (int i = 0; i < epoll_event_num; i++)
+		{
+			HandleEpollEvent(m_events[i]);
+		}
     }
     while(HandleIOEvent() != 0)
     {
@@ -76,13 +90,41 @@ void IOThread::HandleEpollEvent(const epoll_event &ev)
             epoll_event new_ev;
             new_ev.data.fd = ev.data.fd;
             new_ev.events = EPOLLIN | EPOLLET;
-            m_epoll_event_manager.MonitorFd(new_ev.data.fd, new_ev);
+            MonitorFd(new_ev.data.fd, new_ev);
         }
     }
     else if (ev.events & EPOLLIN)
     {
         m_read_handler.OnRead(ev.data.fd);
     }
+}
+
+bool IOThread::MonitorFd(int32_t fd, epoll_event &event)
+{
+	int operation = EPOLL_CTL_MOD;
+	if (m_monitoring_fd.find(fd) == m_monitoring_fd.end())
+	{
+		m_monitoring_fd.emplace(fd);
+		operation = EPOLL_CTL_ADD;
+	}
+
+	if (epoll_ctl(m_epoll_fd, operation, fd, &event) != 0)
+	{
+		LOGE("epoll_ctl failed! operation: {}, errno: {}", operation, errno);
+		return false;
+	}
+	return true;
+}
+
+void IOThread::StopMonitorFd(int32_t fd)
+{
+	m_monitoring_fd.erase(fd);
+	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+}
+
+bool IOThread::IsFdMonitored(int32_t fd)
+{
+	return m_monitoring_fd.find(fd) != m_monitoring_fd.end();
 }
 
 uint32_t IOThread::HandleIOEvent()
@@ -119,14 +161,12 @@ void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
     epoll_event ev;
     ev.events = EPOLLIN | EPOLLET;
     ev.data.fd = io_event.connection_fd;
-    m_epoll_event_manager.MonitorFd(io_event.connection_fd, ev);
-    //todo, 是否需要立即进行read
-    //...
+    MonitorFd(io_event.connection_fd, ev);
 }
 
 void IOThread::OnWrite(const WriteEvent &event)
 {
-    if (m_epoll_event_manager.IsFdMonitored(event.connection_fd))
+    if (IsFdMonitored(event.connection_fd))
     {
         m_write_handler.Send(event.packet);
     }
@@ -157,7 +197,7 @@ void IOThread::BeforeOutputIOEvent(IOEvent *io_event)
         epoll_event ev;
         ev.events = EPOLLOUT | EPOLLET;
         ev.data.fd = io_event->connection_fd;
-        m_epoll_event_manager.MonitorFd(io_event->connection_fd, ev);
+        MonitorFd(io_event->connection_fd, ev);
         delete io_event;
     }
     else
@@ -169,7 +209,7 @@ void IOThread::BeforeOutputIOEvent(IOEvent *io_event)
 void IOThread::CloseConnection(int32_t connection_fd)
 {
     close(connection_fd);
-    m_epoll_event_manager.StopMonitorFd(connection_fd);
+    StopMonitorFd(connection_fd);
     m_read_handler.OnCloseConnection(connection_fd);
     m_write_handler.OnCloseConnection(connection_fd);
 }
