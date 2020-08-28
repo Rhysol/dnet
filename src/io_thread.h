@@ -1,10 +1,11 @@
 #pragma once
 #include <sys/epoll.h>
 #include <time.h>
-#include "read_handler.h"
-#include "write_handler.h"
 #include <set>
 #include "spsc_queue.h"
+#include "io_event.h"
+#include <unordered_map>
+#include "connection.h"
 
 namespace std {
     class thread;
@@ -14,60 +15,54 @@ namespace dnet
 {
 
 struct IOEvent;
+struct NetConfig;
 
-
-class IOThread
+class IOThread : public IOEventPasser
 {
 public:
     IOThread();
     virtual ~IOThread();
 
-    virtual bool Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &create_packet_func, 
-        const OutputIOEventPipe &output_event_pipe);
+    typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
+    virtual bool Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func, const NetConfig *net_config);
 
-    void Start();
-    void Stop();
-    void Join();
-    virtual void Update();
-
-    void AcceptIOEvent(IOEvent *event);
-
-    inline uint16_t GetThreadId() { return m_thread_id; }
+    virtual void Pass2MainThread(IOEvent *io_event) override;
+    virtual void Pass2IOThread(IOEvent *io_event) override;
 
 protected:
     virtual void HandleEpollEvent(const epoll_event &ev);
 
+public:
+    void Start();
+    void Stop();
+    void Join();
+    void Update();
+    inline uint16_t GetThreadId() { return m_thread_id; }
+
+protected:
+    bool EpollCtl(int32_t fd, uint32_t events, int32_t operation);
+
     uint32_t HandleIOEvent();
     void OnRegisterConnection(const RegisterConnectionEvent &event);
-    void OnWrite(const WriteEvent &event);
-    void OnCloseConnectionRequest(const CloseConnectionRequestEvent &event);
+    void OnWrite(WriteEvent &event);
 
-    void BeforeOutputIOEvent(IOEvent *io_event);
     void CloseConnection(int32_t connection_fd);
-
-	//使epoll监听fd的事件，如果fd已经被监听，则更新监听事件
-	bool MonitorFd(int32_t fd, epoll_event &event);
-	//将fd从epoll的监听列表中移除
-	void StopMonitorFd(int32_t fd);
-	bool IsFdMonitored(int32_t fd);
+    void CloseAllConnection();
 
 protected:
     uint16_t m_thread_id;
     std::thread *m_thread = nullptr;
+    std::atomic<bool> m_keep_alive;
+    timespec m_sleep_duration;
+
+    const NetConfig *m_net_config;
+    CreateNetPacketFunc m_create_packet_func;
 
 	int m_epoll_fd;
 	epoll_event *m_events = nullptr;
-	std::set<int32_t> m_monitoring_fd;
-
-    OutputIOEventPipe m_output_io_event_pipe;
-
-    ReadHandler m_read_handler;
-    WriteHandler m_write_handler;
+    std::unordered_map<int32_t, Connection> m_connections;
 
     SPSCQueue<IOEvent> m_io_events;
-
-    std::atomic<bool> m_keep_alive;
-    timespec m_sleep_duration;
 };
 
 }

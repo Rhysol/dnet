@@ -5,6 +5,10 @@
 #include "logger.h"
 #include <spdlog/sinks/hourly_file_sink.h>
 #include <spdlog/async.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <fcntl.h>
 
 using namespace dnet;
 
@@ -18,7 +22,7 @@ NetManager::NetManager()
 
 NetManager::~NetManager()
 {
-    for (auto &thread : m_io_threads)
+    for (IOThread *thread : m_io_threads)
     {
         thread->Stop();
         thread->Join();
@@ -46,20 +50,19 @@ void NetManager::InitThreads()
 {
     m_io_threads.push_back(new ListenerThread);
     m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
-    m_listener_thread->Init(0, &m_net_config, 
-        std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler),
-        std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, 0));
+    m_listener_thread->Init(0, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
+    m_listener_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
     
     IOThread *io_thread = nullptr;
     for (uint16_t i = 1; i < m_net_config.io_thread_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
-        m_io_threads.back()->Init(i, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler),
-            std::bind(&NetManager::AcceptIOEvent, this, std::placeholders::_1, i));    
+        io_thread->Init(i, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
+        io_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
     }
 
-    for (auto &thread : m_io_threads)
+    for (IOThread *thread : m_io_threads)
     {
         thread->Start();
     }
@@ -67,8 +70,7 @@ void NetManager::InitThreads()
 
 void NetManager::Stop()
 {
-    CloseAllConnections();
-    for (auto &thread : m_io_threads)
+    for (IOThread *thread : m_io_threads)
     {
         thread->Stop();
         thread->Join();
@@ -109,14 +111,10 @@ uint32_t NetManager::Update()
 //从listener thread接收的新连接
 void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
 {
-    const Connection *connection = m_connection_manager.AddConnection(event.connection_fd, 
-        event.remote_ip, event.remote_port);
-    if (connection == nullptr) return;
-    uint16_t io_thread_id = HashToIoThread(connection->fd);
-    RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
-    to_thread_event->connection_fd = event.connection_fd; 
-    m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
-    m_net_event_handler->OnNewConnection(connection->fd, connection->remote_ip, connection->remote_port);
+    RegisterConnectionEvent *register_event = new RegisterConnectionEvent;
+    register_event->connection_fd = event.connection_fd; 
+    Pass2IOThread(register_event, HashToIoThread(event.connection_fd));
+    m_net_event_handler->OnNewConnection(event.connection_fd, event.remote_ip, event.remote_port);
 }
 
 void NetManager::OnRead(const ReadEvent &event)
@@ -126,21 +124,36 @@ void NetManager::OnRead(const ReadEvent &event)
 
 void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)
 {
-    m_connection_manager.DisconnectFrom(event.connection_fd);
     m_net_event_handler->OnDisconnect(event.connection_fd);
 }
 
-const Connection *NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
+int32_t NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
 {
-    const Connection *connection = m_connection_manager.ConnectTo(remote_ip, remote_port);
-    if (connection != nullptr)
+    sockaddr_in remote_addr;
+    remote_addr.sin_family = AF_INET;
+    if (inet_aton(remote_ip.c_str(), &remote_addr.sin_addr) == 0)
     {
-        uint16_t io_thread_id = HashToIoThread(connection->fd);
-        RegisterConnectionEvent *to_thread_event = new RegisterConnectionEvent;
-        to_thread_event->connection_fd = connection->fd; 
-        m_io_threads[io_thread_id]->AcceptIOEvent(to_thread_event);
+        LOGE("ip:{} is invalid!", remote_ip);
+        return -1;
     }
-    return connection;
+    remote_addr.sin_port = htons(remote_port);
+
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (connect(fd, (sockaddr *)&remote_addr, sizeof(sockaddr)) == -1)
+    {
+        LOGE("connect to: {}:{} failed! errno: {}", remote_ip, remote_port, errno);
+        return -1;
+    }
+
+    if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) == -1)
+    {
+        LOGE("set to nonblock failed! errno: {}", errno);
+        return -1;
+    }
+    RegisterConnectionEvent *event = new RegisterConnectionEvent;
+    event->connection_fd = fd; 
+    Pass2IOThread(event, HashToIoThread(fd));
+    return fd;
 }
 
 bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len)
@@ -150,31 +163,19 @@ bool NetManager::Send(int32_t connection_fd, const char *data_bytes, uint32_t da
         LOGW("fd: {} send data length is 0", connection_fd);
         return false;
     }
-    if (m_connection_manager.GetConnection(connection_fd) == nullptr)
-    {
-        LOGE("invalid connection_fd: {}", connection_fd);
-        return false;
-    }
     WriteEvent *event = new WriteEvent;
     event->connection_fd = connection_fd;
     event->packet = new PacketToSend(connection_fd, data_len);
     memcpy(event->packet->packet_bytes, data_bytes, data_len);
-    uint16_t io_thread_id = HashToIoThread(connection_fd);
-    m_io_threads[io_thread_id]->AcceptIOEvent(event);
+    Pass2IOThread(event, HashToIoThread(connection_fd));
     return true;
 }
 
 void NetManager::CloseConnection(int32_t connection_fd)
 {
-    uint16_t io_thread_id = HashToIoThread(connection_fd);
     CloseConnectionRequestEvent *event = new CloseConnectionRequestEvent;
     event->connection_fd = connection_fd;
-    m_io_threads[io_thread_id]->AcceptIOEvent(event);
-}
-
-void NetManager::AcceptIOEvent(IOEvent *event, uint16_t thread_id)
-{
-    m_events_queue.Enqueue(event, thread_id);
+    Pass2IOThread(event, HashToIoThread(connection_fd));
 }
 
 uint16_t NetManager::HashToIoThread(int32_t connection_fd)
@@ -183,10 +184,12 @@ uint16_t NetManager::HashToIoThread(int32_t connection_fd)
     return thread_id;
 }
 
-void NetManager::CloseAllConnections()
+void NetManager::Pass2MainThread(IOEvent *event)
 {
-    for (auto &iter : m_connection_manager.GetAllConnections())
-    {
-        CloseConnection(iter.first);
-    }
+    m_events_queue.Enqueue(event, event->source_thread_id);
+}
+
+void NetManager::Pass2IOThread(IOEvent *event, uint16_t io_thread_id)
+{
+    m_io_threads[io_thread_id]->Pass2IOThread(event);
 }

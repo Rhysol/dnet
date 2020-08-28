@@ -16,20 +16,17 @@ IOThread::~IOThread()
     }
 }
 
-bool IOThread::Init(uint16_t thread_id, const ReadHandler::CreateNetPacketFunc &create_packet_func,
-    const OutputIOEventPipe &output_event_pipe)
+bool IOThread::Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func, const NetConfig *net_config)
 {
+    m_net_config = net_config;
+    m_create_packet_func = create_packet_func;
     m_thread_id = thread_id;
     m_sleep_duration.tv_sec = 0;
-    m_sleep_duration.tv_nsec = 1000 * m_net_config.io_thread_sleep_duration; // 1ms
+    m_sleep_duration.tv_nsec = 1000 * m_net_config->io_thread_sleep_duration; // 1ms
     m_keep_alive.store(true, std::memory_order_release);
 
-    m_output_io_event_pipe = output_event_pipe;
-    m_read_handler.Init(create_packet_func, std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
-    m_write_handler.Init(std::bind(&IOThread::BeforeOutputIOEvent, this, std::placeholders::_1));
-
 	m_epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	m_events = new epoll_event[m_net_config.epoll_max_event_num];
+	m_events = new epoll_event[m_net_config->epoll_max_event_num];
 	return true;
 }
 
@@ -57,7 +54,7 @@ void IOThread::Update()
     while(m_keep_alive.load())
     {
         HandleIOEvent();
-		epoll_event_num = epoll_wait(m_epoll_fd, m_events, m_net_config.epoll_max_event_num, 0);
+		epoll_event_num = epoll_wait(m_epoll_fd, m_events, m_net_config->epoll_max_event_num, 0);
 		if (epoll_event_num == -1)
 		{
 			LOGE("epoll_wait failed!");
@@ -77,54 +74,43 @@ void IOThread::Update()
     {
 
     }
+    CloseAllConnection();
     LOGI("thread: {} stopped!", m_thread_id);
 }
 
 void IOThread::HandleEpollEvent(const epoll_event &ev)
 {
+    auto iter = m_connections.find(ev.data.fd);
+    if (iter == m_connections.end())
+    {
+        LOGE("can't find fd {}", ev.data.fd);
+    }
+    Connection &connection = iter->second;
     if (ev.events & EPOLLOUT)
     {
-        if (m_write_handler.HandleUnfinishedPacket(ev.data.fd))
+        if (connection.HandleUnfinishedWrite())
         {
-            m_read_handler.OnRead(ev.data.fd);
-            epoll_event new_ev;
-            new_ev.data.fd = ev.data.fd;
-            new_ev.events = EPOLLIN | EPOLLET;
-            MonitorFd(new_ev.data.fd, new_ev);
+            connection.Read();
+            EpollCtl(ev.data.fd, EPOLLIN | EPOLLET, EPOLL_CTL_MOD);
         }
     }
     else if (ev.events & EPOLLIN)
     {
-        m_read_handler.OnRead(ev.data.fd);
+        connection.Read();
     }
 }
 
-bool IOThread::MonitorFd(int32_t fd, epoll_event &event)
+bool IOThread::EpollCtl(int32_t fd, uint32_t events, int32_t operation)
 {
-	int operation = EPOLL_CTL_MOD;
-	if (m_monitoring_fd.find(fd) == m_monitoring_fd.end())
-	{
-		m_monitoring_fd.emplace(fd);
-		operation = EPOLL_CTL_ADD;
-	}
-
-	if (epoll_ctl(m_epoll_fd, operation, fd, &event) != 0)
-	{
-		LOGE("epoll_ctl failed! operation: {}, errno: {}", operation, errno);
-		return false;
-	}
-	return true;
-}
-
-void IOThread::StopMonitorFd(int32_t fd)
-{
-	m_monitoring_fd.erase(fd);
-	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-}
-
-bool IOThread::IsFdMonitored(int32_t fd)
-{
-	return m_monitoring_fd.find(fd) != m_monitoring_fd.end();
+    epoll_event ev;
+    ev.events = events;
+    ev.data.fd = fd;
+    if (epoll_ctl(m_epoll_fd, operation, ev.data.fd, &ev) != 0)
+    {
+        LOGE("epoll_ctl mod failed! operation: {}, errno: {}", operation, errno);
+        return false;
+    }
+    return true;
 }
 
 uint32_t IOThread::HandleIOEvent()
@@ -142,15 +128,15 @@ uint32_t IOThread::HandleIOEvent()
             OnWrite((WriteEvent &)(*event));
             break;
         case IOEvent::EventType::CLOSE_CONNECTION_REQUEST:
-            OnCloseConnectionRequest((CloseConnectionRequestEvent &)(*event));
+            CloseConnection(event->connection_fd);
             break;
         default:
             { LOGE("unkown event type: {}", (int16_t)event->event_type); }    
             break;
         }
-        delete event;//由io_event_pipe创建
+        delete event;
         ++handle_count;
-        if (handle_count >= m_net_config.io_thread_handle_io_event_num_of_one_update) break;
+        if (handle_count >= m_net_config->io_thread_handle_io_event_num_of_one_update) break;
         event = m_io_events.Dequeue();
     }
     return handle_count;
@@ -158,58 +144,61 @@ uint32_t IOThread::HandleIOEvent()
 
 void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
 {
-    epoll_event ev;
-    ev.events = EPOLLIN | EPOLLET;
-    ev.data.fd = io_event.connection_fd;
-    MonitorFd(io_event.connection_fd, ev);
+    auto result = m_connections.emplace(io_event.connection_fd, Connection());
+    if (!result.second)
+    {
+        LOGE("fd {} already exist!", io_event.connection_fd);
+        return;
+    }
+    Connection &connection = result.first->second;
+    connection.Init(io_event.connection_fd, m_net_config, m_create_packet_func);
+    connection.SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
+    EpollCtl(io_event.connection_fd, EPOLLIN | EPOLLET, EPOLL_CTL_ADD);
+
 }
 
-void IOThread::OnWrite(const WriteEvent &event)
+void IOThread::OnWrite(WriteEvent &event)
 {
-    if (IsFdMonitored(event.connection_fd))
+    auto iter = m_connections.find(event.connection_fd);
+    if (iter != m_connections.end())
     {
-        m_write_handler.Send(event.packet);
+        iter->second.Write(event.packet);
     }
 }
 
-void IOThread::OnCloseConnectionRequest(const CloseConnectionRequestEvent &event)
-{
-    CloseConnection(event.connection_fd);
-}
-
-void IOThread::AcceptIOEvent(IOEvent *event)
-{
-    m_io_events.Enqueue(event);
-}
-
-void IOThread::BeforeOutputIOEvent(IOEvent *io_event)
+void IOThread::Pass2MainThread(IOEvent *io_event)
 {
     if (io_event->event_type == IOEvent::EventType::UNEXPECTED_DISCONNECT)
     {
         CloseConnection(io_event->connection_fd);
-        CloseConnectionCompleteEvent *event = new CloseConnectionCompleteEvent;
-        event->connection_fd = io_event->connection_fd;
-        m_output_io_event_pipe(event);
-        delete io_event;
+        IOEventPasser::Pass2MainThread(io_event);
     }
     else if (io_event->event_type == IOEvent::EventType::WRITE_EAGAIN)
     {
-        epoll_event ev;
-        ev.events = EPOLLOUT | EPOLLET;
-        ev.data.fd = io_event->connection_fd;
-        MonitorFd(io_event->connection_fd, ev);
+        EpollCtl(io_event->connection_fd, EPOLLOUT | EPOLLET, EPOLL_CTL_MOD);
         delete io_event;
     }
-    else
-    {
-        m_output_io_event_pipe(io_event);
-    }
+}
+
+void IOThread::Pass2IOThread(IOEvent *io_event)
+{
+    m_io_events.Enqueue(io_event);
 }
 
 void IOThread::CloseConnection(int32_t connection_fd)
 {
     close(connection_fd);
-    StopMonitorFd(connection_fd);
-    m_read_handler.OnCloseConnection(connection_fd);
-    m_write_handler.OnCloseConnection(connection_fd);
+	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, connection_fd, NULL);
+    m_connections.erase(connection_fd);
+}
+
+void IOThread::CloseAllConnection()
+{
+    int32_t fd = -1;
+    for (auto &iter : m_connections)
+    {
+        fd = iter.second.GetConnectionFD();
+        close(fd);
+        epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    }
 }

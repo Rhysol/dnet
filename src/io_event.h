@@ -23,6 +23,7 @@ struct IOEvent
     virtual ~IOEvent() {}
     EventType event_type;
     int32_t connection_fd = -1;
+    uint16_t source_thread_id = -1;
 };
 
 struct AcceptConnectionEvent : public IOEvent
@@ -139,6 +140,45 @@ struct WriteEagainEvent : public IOEvent
     }
 };
 
-typedef std::function<void (IOEvent *event)> OutputIOEventPipe;
+class IOEventPasser
+{
+public:
+    enum class EDestination : uint16_t
+    {
+        MAIN_THREAD, //事件目的地主线程，从io线程到主线程
+        IO_THREAD, //事件目的地io线程，从主线程到io线程
+        _END
+    };
+
+    void SetNextPasser(IOEventPasser *next_passer, EDestination destination)
+    {
+        if (!next_passer) return;
+        if (destination == EDestination::MAIN_THREAD)
+        {
+            m_next_passer_2_main_thread = next_passer;
+        }
+        else if (destination == EDestination::IO_THREAD)
+        {
+            m_next_passer_2_io_thread = next_passer;
+        }
+    }
+
+    virtual void Pass2IOThread(IOEvent *event)
+    {
+        if (!event || !m_next_passer_2_io_thread) return;
+        m_next_passer_2_io_thread->Pass2IOThread(event);
+    }
+
+    virtual void Pass2MainThread(IOEvent *event)
+    {
+        if (!event || !m_next_passer_2_main_thread) return;
+        m_next_passer_2_main_thread->Pass2MainThread(event);
+    }
+
+protected:
+    IOEventPasser *m_next_passer_2_io_thread = nullptr;
+    IOEventPasser *m_next_passer_2_main_thread = nullptr;
+};
+
 
 }

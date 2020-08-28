@@ -1,4 +1,3 @@
-#include "../src/connection_manager.h"
 #include <iostream>
 #include <unistd.h>
 

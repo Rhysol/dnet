@@ -1,6 +1,5 @@
 #pragma once
 #include <vector>
-#include "connection_manager.h"
 #include "mpsc_queue.h"
 #include "io_event.h"
 #include "net_config.h"
@@ -12,7 +11,7 @@ class IOThread;
 class ListenerThread;
 
 
-class NetManager
+class NetManager : public IOEventPasser
 {
 public:
     NetManager();
@@ -23,7 +22,7 @@ public:
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
 
-    const Connection *ConnectTo(const std::string &remote_ip, uint16_t remote_port);
+    int32_t ConnectTo(const std::string &remote_ip, uint16_t remote_port);
     bool Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len);
     void CloseConnection(int32_t connection_fd);
 
@@ -32,13 +31,12 @@ private:
     void InitThreads();
 
     uint16_t HashToIoThread(int32_t connection_fd);
-    void AcceptIOEvent(IOEvent *event, uint16_t thread_id);
+    virtual void Pass2MainThread(IOEvent *event) override;
+    void Pass2IOThread(IOEvent *event, uint16_t io_thread_id);
 
     void OnAcceptConnection(const AcceptConnectionEvent &event);
     void OnRead(const ReadEvent &event);
     void OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event);
-
-    void CloseAllConnections();
 
 private:
     NetConfig m_net_config;
@@ -46,8 +44,6 @@ private:
     std::vector<IOThread *> m_io_threads;
 
     MPSCQueue<IOEvent> m_events_queue;
-
-    ConnectionManager m_connection_manager;
 
     NetEventInterface *m_net_event_handler;
 

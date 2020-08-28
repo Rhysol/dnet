@@ -1,6 +1,5 @@
 #pragma once
 #include "io_thread.h"
-#include "listener.h"
 
 namespace dnet
 {
@@ -13,15 +12,14 @@ public:
     ListenerThread();
     ~ListenerThread();
 
-    bool Init(uint16_t thread_id, const NetConfig *net_config,
-        const ReadHandler::CreateNetPacketFunc &create_packet_func, 
-        const OutputIOEventPipe &output_event_pipe);
-
+    virtual bool Init(uint16_t thread_id, const IOThread::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config) override;
+    bool StartListen();
 private:
     virtual void HandleEpollEvent(const epoll_event &ev) override;
+    void OnAccept();
 
 private:
-    Listener m_listener;
+	int32_t m_listener_fd = -1;
 };
 
 }
