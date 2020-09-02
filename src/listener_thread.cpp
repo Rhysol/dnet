@@ -22,7 +22,7 @@ ListenerThread::~ListenerThread()
 	}
 }
 
-bool ListenerThread::Init(uint16_t thread_id, const IOThread::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config)
+bool ListenerThread::Init(uint16_t thread_id, const Connection::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config)
 {
     if(!IOThread::Init(thread_id, create_packet_func, net_config)) return false;
     if (!StartListen()) return false;
@@ -60,7 +60,7 @@ bool ListenerThread::StartListen()
 		LOGE("bind listener fd failed");
 		return false;
 	}
-	if (listen(m_listener_fd, global_config.listen_queue_max_num) == -1)
+	if (listen(m_listener_fd, m_net_config->listen_queue_max_num) == -1)
 	{
 		LOGE("listen failed!");
 		return false;

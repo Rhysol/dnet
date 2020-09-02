@@ -12,7 +12,7 @@
 
 using namespace dnet;
 
-NetConfig dnet::global_config;
+NetConfig dnet::default_net_config;
 std::shared_ptr<spdlog::logger> dnet::net_logger;
 
 NetManager::NetManager()
@@ -38,6 +38,7 @@ bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
     m_net_event_handler = net_hander;
     m_events_queue.Init(m_net_config.io_thread_num),
     InitThreads();
+    LOGI("start success");
     return true;
 }
 
@@ -48,13 +49,17 @@ void NetManager::InitLogger()
 
 void NetManager::InitThreads()
 {
-    m_io_threads.push_back(new ListenerThread);
-    m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
-    m_listener_thread->Init(0, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
-    m_listener_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
-    
+    uint16_t i = 0;
+    if (m_net_config.need_listener)
+    {
+        m_io_threads.push_back(new ListenerThread);
+        m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
+        m_listener_thread->Init(0, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
+        m_listener_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
+        ++i;
+    }
     IOThread *io_thread = nullptr;
-    for (uint16_t i = 1; i < m_net_config.io_thread_num; i++)
+    for (; i < m_net_config.io_thread_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
@@ -93,6 +98,7 @@ uint32_t NetManager::Update()
         case IOEvent::EventType::READ:
             OnRead((ReadEvent &)(*event));
             break;
+        case IOEvent::EventType::UNEXPECTED_DISCONNECT:
         case IOEvent::EventType::CLOSE_CONNECTION_COMPLETE:
             OnCloseConnectionComplete((CloseConnectionCompleteEvent &)(*event));
             break;
@@ -119,7 +125,7 @@ void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
 
 void NetManager::OnRead(const ReadEvent &event)
 {
-    m_net_event_handler->OnReceivePacket(*event.packet);
+    m_net_event_handler->OnReceivePacket(event.connection_fd, *event.packet);
 }
 
 void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)

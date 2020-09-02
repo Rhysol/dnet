@@ -1,18 +1,48 @@
+cmake_minimum_required(VERSION 3.15)
 project(test_lib)
 
 add_executable(server
-	main.cpp
+	server.cpp
 )
-
 target_include_directories(server
 	PRIVATE ../src
-)
-
-target_include_directories(server
 	PRIVATE ../third_part
 )
-
 target_link_libraries(server
+	PRIVATE dnet
+	PRIVATE pthread
+)
+
+add_executable(client
+	client.cpp
+)
+target_include_directories(client
+	PRIVATE ../src
+	PRIVATE ../third_part
+)
+target_link_libraries(client
+	PRIVATE dnet
+	PRIVATE pthread
+)
+
+add_executable(spsc_queue_test
+	test_spsc_queue.cpp
+)
+target_include_directories(spsc_queue_test
+	PRIVATE ../src
+)
+target_link_libraries(spsc_queue_test
+	PRIVATE dnet
+	PRIVATE pthread
+)
+
+add_executable(mpsc_queue_test
+	test_mpsc_queue.cpp
+)
+target_include_directories(mpsc_queue_test
+	PRIVATE ../src
+)
+target_link_libraries(mpsc_queue_test
 	PRIVATE dnet
 	PRIVATE pthread
 )

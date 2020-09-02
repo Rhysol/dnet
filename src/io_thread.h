@@ -5,7 +5,9 @@
 #include "spsc_queue.h"
 #include "io_event.h"
 #include <unordered_map>
+#include <unordered_set>
 #include "connection.h"
+#include <vector>
 
 namespace std {
     class thread;
@@ -23,8 +25,7 @@ public:
     IOThread();
     virtual ~IOThread();
 
-    typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
-    virtual bool Init(uint16_t thread_id, const CreateNetPacketFunc &create_packet_func, const NetConfig *net_config);
+    virtual bool Init(uint16_t thread_id, const Connection::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config);
 
     virtual void Pass2MainThread(IOEvent *io_event) override;
     virtual void Pass2IOThread(IOEvent *io_event) override;
@@ -45,6 +46,7 @@ protected:
     uint32_t HandleIOEvent();
     void OnRegisterConnection(const RegisterConnectionEvent &event);
     void OnWrite(WriteEvent &event);
+    void OnCloseConnectionRequest(const CloseConnectionRequestEvent &event);
 
     void CloseConnection(int32_t connection_fd);
     void CloseAllConnection();
@@ -56,11 +58,12 @@ protected:
     timespec m_sleep_duration;
 
     const NetConfig *m_net_config;
-    CreateNetPacketFunc m_create_packet_func;
+    Connection::CreateNetPacketFunc m_create_packet_func;
 
 	int m_epoll_fd;
-	epoll_event *m_events = nullptr;
+	epoll_event *m_epoll_events = nullptr;
     std::unordered_map<int32_t, Connection> m_connections;
+    std::vector<int32_t> m_connections_to_close;
 
     SPSCQueue<IOEvent> m_io_events;
 };

@@ -12,6 +12,7 @@ struct NetConfig
     //****************************************************************//
     // io 线程的数量， listener线程属于io线程
     uint16_t io_thread_num = 1;
+    bool need_listener = true;
     std::string listen_ip = "127.0.0.1";
     uint16_t listen_port = 18889;
 
@@ -34,6 +35,6 @@ struct NetConfig
     uint32_t epoll_max_event_num = 50;
 };
 
-extern NetConfig global_config;
+extern NetConfig default_net_config;
 
 }

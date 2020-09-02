@@ -67,8 +67,6 @@ struct ReadEvent : public IOEvent
             delete packet;
         }
     }
-    ReadEvent(const ReadEvent &to_copy) = delete;
-    ReadEvent &operator=(const ReadEvent &to_copy) = delete;
     NetPacketInterface *packet = nullptr;
 }; 
 

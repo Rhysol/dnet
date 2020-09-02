@@ -16,11 +16,12 @@ Connection::Connection()
 
 Connection::~Connection()
 {
+    LOGE("destruct connection:{}", (void *)this);
     if (m_unfinished_read)
     {
         delete m_unfinished_read;
     }
-    for (PacketToSend *packet : m_unfinished_write)
+    for (PacketToSend *packet : m_packet_to_send)
     {
         delete packet;
     }
@@ -31,13 +32,14 @@ void Connection::Init(int32_t fd, const NetConfig *net_config, CreateNetPacketFu
     m_fd = fd;
     m_net_config = net_config;
     m_create_net_packet_func = create_net_packet_func;
+    m_has_inited = true;
 }
 
-void Connection::Read()
+void Connection::Receive()
 {
     int32_t read_len = -1;
     do {
-        read_len = read(m_fd, m_read_buffer.buffer, ReadBuffer::BufferMaxLen());
+        read_len = recv(m_fd, m_read_buffer.buffer, ReadBuffer::BufferMaxLen(), 0);
         if (read_len > 0)
         {
             m_read_buffer.buffer_len = read_len;
@@ -57,8 +59,11 @@ void Connection::Read()
 
 void Connection::ParseReadBuffer()
 {
-    ReadEvent *event = CreateReadEvent();
-    NetPacketInterface *packet = event->packet;
+    if (!m_unfinished_read)
+    {
+        m_unfinished_read = CreateReadEvent();
+    }
+    NetPacketInterface *packet = m_unfinished_read->packet;
 
     int32_t len_to_read = 0;
     int32_t read_buffer_offset = 0;
@@ -74,7 +79,6 @@ void Connection::ParseReadBuffer()
                 packet->header_offset += m_read_buffer.buffer_len;
                 read_buffer_offset += m_read_buffer.buffer_len;
                 m_read_buffer.buffer_len = 0;
-                m_unfinished_read = event;
             }
             else
             {
@@ -95,7 +99,6 @@ void Connection::ParseReadBuffer()
                 packet->body_offset += m_read_buffer.buffer_len;
                 read_buffer_offset += m_read_buffer.buffer_len;
                 m_read_buffer.buffer_len = 0;
-                m_unfinished_read = event;
             }
             else
             {
@@ -103,9 +106,9 @@ void Connection::ParseReadBuffer()
                 packet->body_offset += len_to_read;
                 read_buffer_offset += len_to_read;
                 m_read_buffer.buffer_len -= len_to_read;
-                Pass2MainThread(event);
-                event = CreateReadEvent();
-                packet = event->packet;
+                Pass2MainThread(m_unfinished_read);
+                m_unfinished_read = CreateReadEvent();
+                packet = m_unfinished_read->packet;
             }
         }
     }
@@ -113,80 +116,47 @@ void Connection::ParseReadBuffer()
 
 ReadEvent *Connection::CreateReadEvent()
 {
-    ReadEvent *event = nullptr;
-    if (!m_unfinished_read)
-    {
-        event = new ReadEvent;
-        event->packet = m_create_net_packet_func();
-        event->packet->body_len = event->packet->ParseBodyLenFromHeader();
-        event->connection_fd = m_fd;
-        return event;
-    }
-    else
-    {
-        event = m_unfinished_read;
-        m_unfinished_read = nullptr;
-    }
+    ReadEvent *event = new ReadEvent();
+    event->packet = m_create_net_packet_func();
+    event->connection_fd = m_fd;
     return event;
 }
 
 void Connection::OnUnexpectedDisconnect()
 {
+    if (m_to_close) return;
+    m_to_close = true;
     UnexpectedDisconnectEvent *event = new UnexpectedDisconnectEvent;
     event->connection_fd = m_fd;
     Pass2MainThread(event);
 }
 
-void Connection::Write(PacketToSend *packet)
+bool Connection::Send(PacketToSend *packet)
 {
-    const char *bytes_to_write = packet->packet_bytes + packet->packet_offset;
-    int32_t len_to_write = packet->packet_len - packet->packet_offset;
-    int32_t write_len = write(packet->connection_fd, bytes_to_write, len_to_write);
-    if (write_len > 0)
-    {
-        packet->packet_offset += write_len;
-        if (write_len < len_to_write)
-        {
-            OnWriteUnfinished(packet);
-        }
-    }
-    else if (write_len == -1)
-    {
-        if (errno == EAGAIN)
-        {
-            OnWriteUnfinished(packet);
-            OnWriteEagain();
-        }
-        else
-        {
-            OnUnexpectedDisconnect();
-        }
-    }
-}
-
-void Connection::OnWriteUnfinished(PacketToSend *packet)
-{
-    m_unfinished_write.push_back(new PacketToSend(std::move(*packet)));
+    m_packet_to_send.push_back(new PacketToSend(std::move(*packet)));
+    SendRemainPacket();
     //积压超过一定数量就断开链接
-    if (m_unfinished_write.size() > global_config.max_unfinished_send_packet)
+    if (m_packet_to_send.size() > m_net_config->max_unfinished_send_packet)
     {
         LOGW("fd: {} unsended packet more than 10, close connection!", packet->connection_fd);
         OnUnexpectedDisconnect();
     }
+    LOGE("send {}", (void *)this);
+    return m_packet_to_send.empty();
 }
 
-bool Connection::HandleUnfinishedWrite()
+bool Connection::SendRemainPacket()
 {
     PacketToSend *packet = nullptr;
     const char *bytes_to_write = 0;
     int32_t len_to_write = 0;
     int32_t write_len = 0;
-    while (m_unfinished_write.size() != 0)
+    while (m_packet_to_send.size() != 0)
     {
-        packet = m_unfinished_write.front();
+        packet = m_packet_to_send.front();
         bytes_to_write = packet->packet_bytes + packet->packet_offset;
         len_to_write = packet->packet_len - packet->packet_offset;
-        write_len = write(packet->connection_fd, bytes_to_write, len_to_write);
+        write_len = send(packet->connection_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
         if (write_len == -1 && errno != EAGAIN)
         {
             OnUnexpectedDisconnect();
@@ -194,7 +164,7 @@ bool Connection::HandleUnfinishedWrite()
         }
         else if (len_to_write == write_len)
         {
-            m_unfinished_write.pop_front();
+            m_packet_to_send.pop_front();
             delete packet;
         }
         else
@@ -203,7 +173,7 @@ bool Connection::HandleUnfinishedWrite()
             break;
         }
     }
-    return m_unfinished_write.empty();
+    return m_packet_to_send.empty();
 }
 
 void Connection::OnWriteEagain()
