@@ -22,9 +22,9 @@ ListenerThread::~ListenerThread()
 	}
 }
 
-bool ListenerThread::Init(uint16_t thread_id, const Connection::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config)
+bool ListenerThread::Init(uint16_t thread_id, const NetConfig *net_config)
 {
-    if(!IOThread::Init(thread_id, create_packet_func, net_config)) return false;
+    if(!IOThread::Init(thread_id, net_config)) return false;
     if (!StartListen()) return false;
 
     //把listener_fd注册到epoll

@@ -1,7 +1,7 @@
 ﻿{
   "configurations": [
     {
-      "name": "Linux-Clang-Debug",
+      "name": "Linux-Debug",
       "generator": "Unix Makefiles",
       "configurationType": "Debug",
       "cmakeExecutable": "/usr/bin/cmake",
@@ -9,7 +9,7 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "-j 6",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "linux_clang_x64" ],
+      "inheritEnvironments": [ "linux_x64" ],
       "remoteMachineName": "${env.LocalVM}",
       "remoteCMakeListsRoot": "$HOME/.vs/${projectDirName}/src",
       "remoteBuildRoot": "$HOME/.vs/${projectDirName}/build/${name}",
@@ -22,9 +22,9 @@
       "variables": []
     },
     {
-      "name": "Linux-Debug",
+      "name": "Linux-Release",
       "generator": "Unix Makefiles",
-      "configurationType": "Debug",
+      "configurationType": "Release",
       "cmakeExecutable": "/usr/bin/cmake",
       "remoteCopySourcesExclusionList": [ ".vs", ".git", "out" ],
       "cmakeCommandArgs": "",

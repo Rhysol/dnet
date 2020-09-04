@@ -12,7 +12,7 @@ public:
     ListenerThread();
     ~ListenerThread();
 
-    virtual bool Init(uint16_t thread_id, const Connection::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config) override;
+    virtual bool Init(uint16_t thread_id, const NetConfig *net_config) override;
     bool StartListen();
 private:
     virtual void HandleEpollEvent(const epoll_event &ev) override;

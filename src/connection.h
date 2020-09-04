@@ -56,7 +56,7 @@ public:
     ~Connection();
 
     typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
-    void Init(int32_t fd, const NetConfig *net_config, CreateNetPacketFunc create_net_packet_func);
+    void Init(int32_t fd, const NetConfig *net_config);
     inline bool HasInited() { return m_has_inited; }
 
     void Receive();
@@ -79,9 +79,8 @@ private:
     bool m_has_inited = false;
     bool m_to_close = false;
     const NetConfig *m_net_config = nullptr;
-    CreateNetPacketFunc m_create_net_packet_func;
 
-    ReadBuffer m_read_buffer;
+    thread_local static ReadBuffer m_read_buffer;
     ReadEvent *m_unfinished_read = nullptr;
 
     std::deque<PacketToSend *> m_packet_to_send;

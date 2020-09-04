@@ -36,6 +36,11 @@ std::set<int32_t> connected_fd;
 class NetHandler : public NetEventInterface
 {
 public:
+	void Init(uint32_t thread_num, NetConfig *config)
+	{
+		m_count.resize(thread_num);
+		m_net_config = config;
+	}
     virtual NetPacketInterface *CreateNetPacket() override
 	{
 		return new NetPacket(512);
@@ -45,7 +50,7 @@ public:
 		LOGI("new connection, ip: {}:{}", ip, port);
 		connected_fd.emplace(connection_fd);
 	}
-    virtual void OnReceivePacket(int32_t conncection_fd, const NetPacketInterface &packet) override
+    virtual void OnReceivePacket(int32_t conncection_fd, const NetPacketInterface &packet, uint32_t thread_id) override
 	{
 		char *data = new char[packet.header_len + packet.body_len + 1];
 		data[packet.header_len + packet.body_len] = '\0';
@@ -61,7 +66,7 @@ public:
 			m_end_time = GetNowTime();
 		}
 		delete[] data;
-		++m_count;
+		++m_count[thread_id];
 	}
     virtual void OnDisconnect(int32_t connection_fd) override
 	{
@@ -77,13 +82,18 @@ public:
 	void PrintCostTime()
 	{
 		auto duration = m_end_time - m_start_time;
-		LOGI("handle {} cost {} ms", m_count, std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
+		for (uint32_t i = 0; i < m_count.size(); i++)
+		{
+			LOGI("thread {} handle count : {}", i, m_count[i]);
+		}
+		LOGI("cost {} ms", std::chrono::duration_cast<std::chrono::milliseconds>(duration).count());
 	}
 
 private:
 	std::chrono::system_clock::time_point m_start_time = std::chrono::system_clock::time_point::min();
 	std::chrono::system_clock::time_point m_end_time = std::chrono::system_clock::time_point::min();
-	uint32_t m_count = 0;
+	std::vector<uint32_t> m_count;
+	NetConfig *m_net_config;
 };
 
 NetHandler handler;
@@ -115,15 +125,20 @@ void HandleStopSig(int sig)
 
 int main(int argc, char *argv[])
 {
-
+	if (argc < 1)
+	{
+		//LOGE("paramter num less than 1");
+		return -1;
+	}
 	NetConfig config;
 	config.io_thread_num = std::atoi(argv[1]);
 	config.listen_ip = "0.0.0.0";
 	config.listen_port = 18889;
 	net.Init(config, &handler);
+	handler.Init(config.io_thread_num, net.GetConfig());
 	if (signal(SIGUSR1, &HandleStopSig) == SIG_ERR)
 	{
-		LOGE("register signal failed");
+		//LOGE("register signal failed");
 		return -1;
 	}
 	while (net.IsAlive())

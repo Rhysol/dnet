@@ -9,6 +9,8 @@
 
 using namespace dnet;
 
+thread_local ReadBuffer Connection::m_read_buffer;
+
 Connection::Connection()
 {
 
@@ -16,7 +18,6 @@ Connection::Connection()
 
 Connection::~Connection()
 {
-    LOGE("destruct connection:{}", (void *)this);
     if (m_unfinished_read)
     {
         delete m_unfinished_read;
@@ -27,11 +28,10 @@ Connection::~Connection()
     }
 }
 
-void Connection::Init(int32_t fd, const NetConfig *net_config, CreateNetPacketFunc create_net_packet_func)
+void Connection::Init(int32_t fd, const NetConfig *net_config)
 {
     m_fd = fd;
     m_net_config = net_config;
-    m_create_net_packet_func = create_net_packet_func;
     m_has_inited = true;
 }
 
@@ -117,7 +117,7 @@ void Connection::ParseReadBuffer()
 ReadEvent *Connection::CreateReadEvent()
 {
     ReadEvent *event = new ReadEvent();
-    event->packet = m_create_net_packet_func();
+    event->packet = m_net_config->create_net_packet_func();
     event->connection_fd = m_fd;
     return event;
 }
@@ -141,7 +141,6 @@ bool Connection::Send(PacketToSend *packet)
         LOGW("fd: {} unsended packet more than 10, close connection!", packet->connection_fd);
         OnUnexpectedDisconnect();
     }
-    LOGE("send {}", (void *)this);
     return m_packet_to_send.empty();
 }
 
@@ -157,9 +156,17 @@ bool Connection::SendRemainPacket()
         bytes_to_write = packet->packet_bytes + packet->packet_offset;
         len_to_write = packet->packet_len - packet->packet_offset;
         write_len = send(packet->connection_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
-        if (write_len == -1 && errno != EAGAIN)
+        if (write_len == -1)
         {
-            OnUnexpectedDisconnect();
+            if (EAGAIN == errno)
+            {
+                OnWriteEagain();
+                LOGI("eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
+            }
+            else
+            {
+                OnUnexpectedDisconnect();
+            }
             break;
         }
         else if (len_to_write == write_len)
@@ -170,7 +177,14 @@ bool Connection::SendRemainPacket()
         else
         {
             packet->packet_offset += write_len;
-            break;
+            if (errno != EAGAIN)
+            {
+                LOGI("not-eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
+            }
+            else
+            {
+                LOGI("eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
+            }
         }
     }
     return m_packet_to_send.empty();

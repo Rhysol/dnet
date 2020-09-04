@@ -25,9 +25,8 @@ public:
     int32_t ConnectTo(const std::string &remote_ip, uint16_t remote_port);
     bool Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len);
     void CloseConnection(int32_t connection_fd);
-
+    NetConfig *GetConfig() { return m_net_config; }
 private:
-    void InitLogger();
     void InitThreads();
 
     uint16_t HashToIoThread(int32_t connection_fd);
@@ -39,13 +38,13 @@ private:
     void OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event);
 
 private:
-    NetConfig m_net_config;
-    ListenerThread *m_listener_thread;
+    NetConfig *m_net_config = nullptr;
+    ListenerThread *m_listener_thread = nullptr;
     std::vector<IOThread *> m_io_threads;
 
     MPSCQueue<IOEvent> m_events_queue;
 
-    NetEventInterface *m_net_event_handler;
+    NetEventInterface *m_net_event_handler = nullptr;
 
     bool m_keep_alive = true;
 };

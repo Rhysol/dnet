@@ -13,7 +13,6 @@
 using namespace dnet;
 
 NetConfig dnet::default_net_config;
-std::shared_ptr<spdlog::logger> dnet::net_logger;
 
 NetManager::NetManager()
 {
@@ -33,37 +32,33 @@ NetManager::~NetManager()
 bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
 {
     if (net_hander == nullptr) return false;
-    InitLogger();
-    m_net_config = config;
     m_net_event_handler = net_hander;
-    m_events_queue.Init(m_net_config.io_thread_num),
+    m_net_config = new NetConfig(config);
+    m_net_config->logger = spdlog::hourly_logger_mt<spdlog::async_factory>(m_net_config->logger_name, m_net_config->log_path);
+    m_net_config->create_net_packet_func = std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler);
+    m_events_queue.Init(m_net_config->io_thread_num),
     InitThreads();
     LOGI("start success");
     return true;
 }
 
-void NetManager::InitLogger()
-{
-    net_logger = spdlog::hourly_logger_mt<spdlog::async_factory>("net_logger", "log/net.log");
-}
-
 void NetManager::InitThreads()
 {
     uint16_t i = 0;
-    if (m_net_config.need_listener)
+    if (m_net_config->need_listener)
     {
         m_io_threads.push_back(new ListenerThread);
         m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
-        m_listener_thread->Init(0, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
+        m_listener_thread->Init(0, m_net_config);
         m_listener_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
         ++i;
     }
     IOThread *io_thread = nullptr;
-    for (; i < m_net_config.io_thread_num; i++)
+    for (; i < m_net_config->io_thread_num; i++)
     {
         io_thread = new IOThread;
         m_io_threads.push_back(io_thread);
-        io_thread->Init(i, std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler), &m_net_config);
+        io_thread->Init(i, m_net_config);
         io_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
     }
 
@@ -108,7 +103,7 @@ uint32_t NetManager::Update()
         }
         delete event;//由io_event_pipe创建
         ++handle_count;
-        if (handle_count >= m_net_config.net_manager_handle_io_event_num_of_one_update) break;
+        if (handle_count >= m_net_config->net_manager_handle_io_event_num_of_one_update) break;
         event = m_events_queue.Dequeue();
     }
     return handle_count;
@@ -125,7 +120,7 @@ void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
 
 void NetManager::OnRead(const ReadEvent &event)
 {
-    m_net_event_handler->OnReceivePacket(event.connection_fd, *event.packet);
+    m_net_event_handler->OnReceivePacket(event.connection_fd, *event.packet, event.source_thread_id);
 }
 
 void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)
@@ -186,7 +181,7 @@ void NetManager::CloseConnection(int32_t connection_fd)
 
 uint16_t NetManager::HashToIoThread(int32_t connection_fd)
 {
-    uint16_t thread_id = connection_fd % (int32_t)m_net_config.io_thread_num;
+    uint16_t thread_id = connection_fd % (int32_t)m_net_config->io_thread_num;
     return thread_id;
 }
 

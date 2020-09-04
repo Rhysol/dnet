@@ -72,7 +72,7 @@ int main()
     t.join();
     std::cout << "start dequeue all" << std::endl;
     MyStruct *tmp = nullptr;
-    while(tmp = queue.Dequeue())
+    while((tmp = queue.Dequeue()))
     {
         delete tmp;
         ++i;

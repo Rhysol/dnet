@@ -20,10 +20,9 @@ IOThread::~IOThread()
     }
 }
 
-bool IOThread::Init(uint16_t thread_id, const Connection::CreateNetPacketFunc &create_packet_func, const NetConfig *net_config)
+bool IOThread::Init(uint16_t thread_id, const NetConfig *net_config)
 {
     m_net_config = net_config;
-    m_create_packet_func = create_packet_func;
     m_thread_id = thread_id;
     m_sleep_duration.tv_sec = 0;
     m_sleep_duration.tv_nsec = 1000 * m_net_config->io_thread_sleep_duration; // 1ms
@@ -49,6 +48,10 @@ void IOThread::Join()
     if(m_thread->joinable())
     {
         m_thread->join();
+    }
+    else
+    {
+        LOGE("join twice");
     }
 }
 
@@ -159,7 +162,7 @@ void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
         LOGE("fd {} already exist!", io_event.connection_fd);
         return;
     }
-    connection.Init(io_event.connection_fd, m_net_config, m_create_packet_func);
+    connection.Init(io_event.connection_fd, m_net_config);
     connection.SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
     EpollCtl(io_event.connection_fd, EPOLLIN | EPOLLET, EPOLL_CTL_ADD);
 

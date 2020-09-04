@@ -88,7 +88,7 @@ int main()
 		delete producer_thread[i];
 	}
 
-	while(tmp = queue.Dequeue())
+	while((tmp = queue.Dequeue()))
 	{
 		delete tmp;
 		++i;

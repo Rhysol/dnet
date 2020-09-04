@@ -1,9 +1,18 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <memory>
+#include <functional>
+
+namespace spdlog
+{
+    class logger;
+}
 
 namespace dnet
 {
+
+class NetPacketInterface;
 
 struct NetConfig
 {
@@ -15,6 +24,8 @@ struct NetConfig
     bool need_listener = true;
     std::string listen_ip = "127.0.0.1";
     uint16_t listen_port = 18889;
+    std::string logger_name = "net_logger";
+    std::string log_path = "log/net.log";
 
     //****************************************************************//
     //**************************非必要配置 ****************************//
@@ -33,6 +44,10 @@ struct NetConfig
     uint32_t listen_queue_max_num = 100;
     //epoll_wait每次处理的事件最大数量
     uint32_t epoll_max_event_num = 50;
+
+    std::shared_ptr<spdlog::logger> logger;
+    typedef std::function<NetPacketInterface * ()> CreateNetPacketFunc;
+    CreateNetPacketFunc create_net_packet_func;
 };
 
 extern NetConfig default_net_config;
