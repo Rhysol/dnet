@@ -70,12 +70,13 @@ private:
     void ParseReadBuffer();
     ReadEvent *CreateReadEvent();
 
+    bool DoSendRemainPacket();
     void OnWriteEagain();
 
     //读或者写的过程中发现连接断开，服务器被动断开连接
     void OnUnexpectedDisconnect();
 private:
-    int32_t m_fd;
+    int32_t m_fd = -1;
     bool m_has_inited = false;
     bool m_to_close = false;
     const NetConfig *m_net_config = nullptr;
@@ -83,6 +84,7 @@ private:
     thread_local static ReadBuffer m_read_buffer;
     ReadEvent *m_unfinished_read = nullptr;
 
+    bool m_can_send = true;
     std::deque<PacketToSend *> m_packet_to_send;
 };
 

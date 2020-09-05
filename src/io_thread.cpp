@@ -49,10 +49,6 @@ void IOThread::Join()
     {
         m_thread->join();
     }
-    else
-    {
-        LOGE("join twice");
-    }
 }
 
 void IOThread::Update()
@@ -100,13 +96,9 @@ void IOThread::HandleEpollEvent(const epoll_event &ev)
     Connection &connection = iter->second;
     if (ev.events & EPOLLOUT)
     {
-        if (connection.SendRemainPacket())
-        {
-            connection.Receive();
-            EpollCtl(ev.data.fd, EPOLLIN | EPOLLET, EPOLL_CTL_MOD);
-        }
+        connection.SendRemainPacket();
     }
-    else if (ev.events & EPOLLIN)
+    if (ev.events & EPOLLIN)
     {
         connection.Receive();
     }
@@ -164,7 +156,7 @@ void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
     }
     connection.Init(io_event.connection_fd, m_net_config);
     connection.SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
-    EpollCtl(io_event.connection_fd, EPOLLIN | EPOLLET, EPOLL_CTL_ADD);
+    EpollCtl(io_event.connection_fd, EPOLLIN | EPOLLOUT | EPOLLET, EPOLL_CTL_ADD);
 
 }
 
@@ -187,12 +179,6 @@ void IOThread::OnCloseConnectionRequest(const CloseConnectionRequestEvent &event
 
 void IOThread::Pass2MainThread(IOEvent *io_event)
 {
-    if (io_event->event_type == IOEvent::EventType::WRITE_EAGAIN)
-    {
-        EpollCtl(io_event->connection_fd, EPOLLOUT | EPOLLET, EPOLL_CTL_MOD);
-        delete io_event;
-        return;
-    }
     if (io_event->event_type == IOEvent::EventType::UNEXPECTED_DISCONNECT)
     {
         m_connections_to_close.push_back(io_event->connection_fd);

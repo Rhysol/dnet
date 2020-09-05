@@ -14,8 +14,9 @@ namespace dnet
 
 class NetPacketInterface;
 
-struct NetConfig
+class NetConfig
 {
+public:
     //****************************************************************//
     //****************************必要配置 ****************************//
     //****************************************************************//
@@ -49,7 +50,5 @@ struct NetConfig
     typedef std::function<NetPacketInterface * ()> CreateNetPacketFunc;
     CreateNetPacketFunc create_net_packet_func;
 };
-
-extern NetConfig default_net_config;
 
 }

@@ -69,6 +69,7 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
 	net.Init(config, &handler);
+	handler.Init(net.GetConfig());
 	NetConfig *m_net_config = net.GetConfig();
 	int32_t connection_fd = net.ConnectTo("127.0.0.1", 18889);
 	if(connection_fd <= 0)

@@ -4,7 +4,7 @@ project(lib_dnet)
 
 set(CMAKE_CXX_STANDARD 11)
 
-set(CMAKE_CXX_FLAGS "-g -O3 -Wall -Wextra -fPIC")
+set(CMAKE_CXX_FLAGS "-g -Wall -Wextra -fPIC")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 

@@ -12,8 +12,6 @@
 
 using namespace dnet;
 
-NetConfig dnet::default_net_config;
-
 NetManager::NetManager()
 {
 
@@ -27,6 +25,7 @@ NetManager::~NetManager()
         thread->Join();
         delete thread;
     }
+    delete m_net_config;
 }
 
 bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
@@ -96,6 +95,8 @@ uint32_t NetManager::Update()
         case IOEvent::EventType::UNEXPECTED_DISCONNECT:
         case IOEvent::EventType::CLOSE_CONNECTION_COMPLETE:
             OnCloseConnectionComplete((CloseConnectionCompleteEvent &)(*event));
+            break;
+        case IOEvent::EventType::WRITE_EAGAIN:
             break;
         default:
             { LOGE("unkown event type{}", (int16_t)event->event_type); }

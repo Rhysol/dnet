@@ -15,10 +15,8 @@ struct IOEvent
         CLOSE_CONNECTION_COMPLETE, //io线程完成关闭链接，通知到主线程
         READ,   //io线程读取了一个完整的网络包，发送给主线程
         WRITE,  //主线程把要发送给指定链接的网络包传给io线程，由io线程进行发送
-
-        //io线程内事件，非跨线程
         UNEXPECTED_DISCONNECT, //读或写的过程中发现链接意外断开
-        WRITE_EAGAIN, //写的过程中出现EAGAIN错误
+        WRITE_EAGAIN, //写的过程中出现EAGAIN
     };
     virtual ~IOEvent() {}
     EventType event_type;

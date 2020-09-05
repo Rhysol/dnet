@@ -45,13 +45,17 @@ void Connection::Receive()
             m_read_buffer.buffer_len = read_len;
             ParseReadBuffer();
         }
-        else if (read_len == 0)
+        else if (-1 == read_len)
         {
-            //OnUnexpectedDisconnect(connection_fd);
+            if (EAGAIN != errno)
+            {
+                OnUnexpectedDisconnect();
+            }
             return;
         }
-        else if (read_len == -1)
+        else if (read_len == 0)
         {
+            OnUnexpectedDisconnect();
             return;
         }
     } while (true);
@@ -134,17 +138,26 @@ void Connection::OnUnexpectedDisconnect()
 bool Connection::Send(PacketToSend *packet)
 {
     m_packet_to_send.push_back(new PacketToSend(std::move(*packet)));
-    SendRemainPacket();
+    if (m_can_send)
+    {
+        DoSendRemainPacket();
+    }
     //积压超过一定数量就断开链接
     if (m_packet_to_send.size() > m_net_config->max_unfinished_send_packet)
     {
-        LOGW("fd: {} unsended packet more than 10, close connection!", packet->connection_fd);
+        LOGW("fd: {} unsended packet more than {}, close connection!", m_fd, m_net_config->max_unfinished_send_packet);
         OnUnexpectedDisconnect();
     }
     return m_packet_to_send.empty();
 }
 
 bool Connection::SendRemainPacket()
+{
+    m_can_send = true;
+    return DoSendRemainPacket();
+}
+
+bool Connection::DoSendRemainPacket()
 {
     PacketToSend *packet = nullptr;
     const char *bytes_to_write = 0;
@@ -161,12 +174,12 @@ bool Connection::SendRemainPacket()
             if (EAGAIN == errno)
             {
                 OnWriteEagain();
-                LOGI("eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
             }
             else
             {
                 OnUnexpectedDisconnect();
             }
+            m_can_send = false;
             break;
         }
         else if (len_to_write == write_len)
@@ -177,14 +190,6 @@ bool Connection::SendRemainPacket()
         else
         {
             packet->packet_offset += write_len;
-            if (errno != EAGAIN)
-            {
-                LOGI("not-eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
-            }
-            else
-            {
-                LOGI("eagain socket: {}, to write_len:{}, actually write {}", packet->connection_fd, len_to_write, write_len);
-            }
         }
     }
     return m_packet_to_send.empty();
