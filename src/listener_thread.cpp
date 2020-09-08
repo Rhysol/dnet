@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <cstring>
 #include "net_config.h"
@@ -55,6 +56,14 @@ bool ListenerThread::StartListen()
 		LOGE("create listen socket failed");
 		return false;
 	}
+	linger linger_val;
+	linger_val.l_onoff = 1;
+	linger_val.l_linger = 3;
+	if (setsockopt(m_listener_fd, SOL_SOCKET, SO_LINGER, (void *)&linger_val, sizeof(linger)) == -1)
+	{
+		LOGE("set listener_fd linger failed, errno: {}", errno);
+		return false;
+	}
 	if (bind(m_listener_fd, (sockaddr *)&server_addr, sizeof(sockaddr)) == -1)
 	{
 		LOGE("bind listener fd failed");
@@ -90,13 +99,32 @@ void ListenerThread::OnAccept()
 	if (client_fd == -1)
 	{
 		LOGW("accept client failed! errno: {}", errno);
+		return;
 	}
-	else
+	linger linger_val;
+	linger_val.l_onoff = 1;
+	linger_val.l_linger = 3;
+	if (setsockopt(client_fd, SOL_SOCKET, SO_LINGER, (void *)&linger_val, sizeof(linger)) == -1)
 	{
-        AcceptConnectionEvent *event = new AcceptConnectionEvent; //在net_manager内被删除
-        event->connection_fd = client_fd;
-        event->remote_ip = inet_ntoa(client_addr.sin_addr);
-        event->remote_port = ntohs(client_addr.sin_port);
-		Pass2MainThread(event);
+		LOGE("set client_fd linger failed, errno: {}", errno);
+		return;
 	}
+	int32_t reuse_addr = 1;
+	if (setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse_addr, sizeof(int32_t)) == -1)
+	{
+		LOGE("set client_fd SO_REUSEADDR failed, errno: {}", errno);
+		return;
+	}
+	int32_t nodelay = 1;
+	if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&nodelay, sizeof(int32_t)) == -1)
+	{
+		LOGE("set client_fd TCP_NODELAY failed, errno: {}", errno);
+		return;
+	}
+
+    AcceptConnectionEvent *event = new AcceptConnectionEvent; //在net_manager内被删除
+    event->connection_fd = client_fd;
+    event->remote_ip = inet_ntoa(client_addr.sin_addr);
+    event->remote_port = ntohs(client_addr.sin_port);
+    Pass2MainThread(event);
 }

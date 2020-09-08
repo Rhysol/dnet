@@ -28,8 +28,9 @@ Connection::~Connection()
     }
 }
 
-void Connection::Init(int32_t fd, const NetConfig *net_config)
+void Connection::Init(uint64_t id, int32_t fd, const NetConfig *net_config)
 {
+    m_id = id;
     m_fd = fd;
     m_net_config = net_config;
     m_has_inited = true;
@@ -39,10 +40,10 @@ void Connection::Receive()
 {
     int32_t read_len = -1;
     do {
-        read_len = recv(m_fd, m_read_buffer.buffer, ReadBuffer::BufferMaxLen(), 0);
+        read_len = recv(m_fd, m_read_buffer.buffer, ReadBuffer::Capacity(), 0);
         if (read_len > 0)
         {
-            m_read_buffer.buffer_len = read_len;
+            m_read_buffer.size = read_len;
             ParseReadBuffer();
         }
         else if (-1 == read_len)
@@ -69,51 +70,53 @@ void Connection::ParseReadBuffer()
     }
     NetPacketInterface *packet = m_unfinished_read->packet;
 
-    int32_t len_to_read = 0;
-    int32_t read_buffer_offset = 0;
-    while (m_read_buffer.buffer_len != 0)
+    uint32_t len_to_read = 0;
+    while (m_read_buffer.offset != m_read_buffer.size)
     {
-        //读取包头
-        if (packet->header_offset < packet->header_len)
+        UpdatePacketDataCapacity(packet, m_read_buffer.buffer + m_read_buffer.offset, m_read_buffer.size - m_read_buffer.offset);
+        len_to_read = std::min<uint32_t>(packet->data_capacity - packet->data_size, m_read_buffer.size - m_read_buffer.offset);
+        memcpy(packet->data + packet->data_size, m_read_buffer.buffer, len_to_read);
+        packet->data_size += len_to_read;
+        m_read_buffer.offset += len_to_read;
+        if (packet->data_capacity_adjusted_success &&
+            packet->data_size == packet->data_capacity)
         {
-            len_to_read = packet->header_len - packet->header_offset;
-            if (m_read_buffer.buffer_len < len_to_read)
-            {
-                memcpy(packet->header + packet->header_offset, m_read_buffer.buffer + read_buffer_offset, m_read_buffer.buffer_len);
-                packet->header_offset += m_read_buffer.buffer_len;
-                read_buffer_offset += m_read_buffer.buffer_len;
-                m_read_buffer.buffer_len = 0;
-            }
-            else
-            {
-                memcpy(packet->header + packet->header_offset, m_read_buffer.buffer + read_buffer_offset, len_to_read);
-                packet->header_offset += len_to_read;
-                read_buffer_offset += len_to_read;
-                m_read_buffer.buffer_len -= len_to_read;
-                packet->body_len = packet->ParseBodyLenFromHeader();
-                packet->body = new char[packet->body_len];
-            }
+            Pass2MainThread(m_unfinished_read);
+            m_unfinished_read = CreateReadEvent();
+            packet = m_unfinished_read->packet;
         }
-        else //读取body
+    }
+    m_read_buffer.offset = 0;
+}
+
+void Connection::UpdatePacketDataCapacity(NetPacketInterface *packet, const char *bytes, uint32_t bytes_len)
+{
+    if (packet->data == nullptr)
+    {
+        if (bytes_len < packet->header_len)
         {
-            len_to_read = packet->body_len - packet->body_offset;
-            if (m_read_buffer.buffer_len < len_to_read)
-            {
-                memcpy(packet->body + packet->body_offset, m_read_buffer.buffer + read_buffer_offset, m_read_buffer.buffer_len);
-                packet->body_offset += m_read_buffer.buffer_len;
-                read_buffer_offset += m_read_buffer.buffer_len;
-                m_read_buffer.buffer_len = 0;
-            }
-            else
-            {
-                memcpy(packet->body + packet->body_offset, m_read_buffer.buffer + read_buffer_offset, len_to_read);
-                packet->body_offset += len_to_read;
-                read_buffer_offset += len_to_read;
-                m_read_buffer.buffer_len -= len_to_read;
-                Pass2MainThread(m_unfinished_read);
-                m_unfinished_read = CreateReadEvent();
-                packet = m_unfinished_read->packet;
-            }
+            packet->data_capacity = packet->header_len;
+        }
+        else
+        {
+            packet->data_capacity = packet->header_len + packet->ParseBodyLenFromHeader(bytes);
+            packet->data_capacity_adjusted_success = true;
+        }
+        packet->data = new char[packet->data_capacity];
+    }
+    else
+    {
+        if (!packet->data_capacity_adjusted_success &&
+            packet->data_size + bytes_len >= packet->header_len)
+        {
+            memcpy(packet->data + packet->data_size, bytes, packet->header_len - packet->data_size);
+            uint32_t body_len = packet->ParseBodyLenFromHeader(packet->data);
+            char *temp = new char[packet->header_len + body_len];
+            memcpy(temp, packet->data, packet->data_size);
+            delete[] packet->data;
+            packet->data = temp;
+            packet->data_capacity = packet->header_len + body_len;
+            packet->data_capacity_adjusted_success = true;
         }
     }
 }
@@ -122,7 +125,7 @@ ReadEvent *Connection::CreateReadEvent()
 {
     ReadEvent *event = new ReadEvent();
     event->packet = m_net_config->create_net_packet_func();
-    event->connection_fd = m_fd;
+    event->connection_id = m_id;
     return event;
 }
 
@@ -131,7 +134,7 @@ void Connection::OnUnexpectedDisconnect()
     if (m_to_close) return;
     m_to_close = true;
     UnexpectedDisconnectEvent *event = new UnexpectedDisconnectEvent;
-    event->connection_fd = m_fd;
+    event->connection_id = m_id;
     Pass2MainThread(event);
 }
 
@@ -168,7 +171,7 @@ bool Connection::DoSendRemainPacket()
         packet = m_packet_to_send.front();
         bytes_to_write = packet->packet_bytes + packet->packet_offset;
         len_to_write = packet->packet_len - packet->packet_offset;
-        write_len = send(packet->connection_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
+        write_len = send(m_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
         if (write_len == -1)
         {
             if (EAGAIN == errno)
@@ -198,6 +201,6 @@ bool Connection::DoSendRemainPacket()
 void Connection::OnWriteEagain()
 {
     WriteEagainEvent *event = new WriteEagainEvent;
-    event->connection_fd = m_fd;
+    event->connection_id = m_id;
     Pass2MainThread(event);
 }

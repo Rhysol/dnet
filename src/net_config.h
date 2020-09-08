@@ -51,4 +51,5 @@ public:
     CreateNetPacketFunc create_net_packet_func;
 };
 
+extern uint64_t g_dnet_time_ms;
 }

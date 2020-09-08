@@ -25,14 +25,14 @@ public:
 	{
 
 	}
-    uint32_t ParseBodyLenFromHeader() override {
+    uint32_t ParseBodyLenFromHeader(const char *) override {
 		return 512;
 	}
 };
 
 NetManager net;
 
-std::set<int32_t> connected_fd;
+std::set<uint64_t> connected_id;
 class NetHandler : public NetEventInterface
 {
 public:
@@ -45,33 +45,28 @@ public:
 	{
 		return new NetPacket(512);
 	}
-	virtual void OnNewConnection(int32_t connection_fd, const std::string &ip, uint16_t port) override
+	virtual void OnNewConnection(uint64_t connection_id, const std::string &ip, uint16_t port) override
 	{
 		LOGI("new connection, ip: {}:{}", ip, port);
-		connected_fd.emplace(connection_fd);
+		connected_id.emplace(connection_id);
 	}
-    virtual void OnReceivePacket(int32_t conncection_fd, const NetPacketInterface &packet, uint32_t thread_id) override
+    virtual void OnReceivePacket(uint64_t conncection_id, NetPacketInterface &packet, uint32_t thread_id) override
 	{
-		char *data = new char[packet.header_len + packet.body_len + 1];
-		data[packet.header_len + packet.body_len] = '\0';
-		memcpy(data, packet.header, packet.header_len);
-		memcpy(data + packet.header_len, packet.body, packet.body_len);
-		net.Send(conncection_fd, data, packet.header_len + packet.body_len);
-		if (m_start_time == std::chrono::system_clock::time_point::min() && strncmp(data, "start", 5))
+		net.Send(conncection_id, packet.data, packet.data_size);
+		if (m_start_time == std::chrono::system_clock::time_point::min() && strncmp(packet.data, "start", 5))
 		{
 			m_start_time = GetNowTime();
 		}
-		else if (m_end_time < GetNowTime() && strncmp(data, "end", 3))
+		else if (m_end_time < GetNowTime() && strncmp(packet.data, "end", 3))
 		{
 			m_end_time = GetNowTime();
 		}
-		delete[] data;
 		++m_count[thread_id];
 	}
-    virtual void OnDisconnect(int32_t connection_fd) override
+    virtual void OnDisconnect(uint64_t connection_id) override
 	{
-		LOGI("connection: {} disconnect", connection_fd);
-		connected_fd.erase(connection_fd);
+		LOGI("connection: {} disconnect", connection_id);
+		connected_id.erase(connection_id);
 	}
 
     std::chrono::system_clock::time_point GetNowTime()
@@ -97,23 +92,6 @@ private:
 };
 
 NetHandler handler;
-
-uint32_t total_send_num = 0;
-int32_t SendMessage()
-{
-	static uint32_t sended_num = 0;
-	char data[1024];
-	for (int32_t fd : connected_fd)
-	{
-		net.Send(fd, data, 1024);
-		++sended_num;
-	}
-	if (sended_num > total_send_num)
-	{
-		return 0;
-	}
-	return -1;
-}
 
 void HandleStopSig(int sig)
 {

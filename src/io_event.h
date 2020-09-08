@@ -20,8 +20,8 @@ struct IOEvent
     };
     virtual ~IOEvent() {}
     EventType event_type;
-    int32_t connection_fd = -1;
     uint16_t source_thread_id = -1;
+    uint64_t connection_id = 0;
 };
 
 struct AcceptConnectionEvent : public IOEvent
@@ -31,6 +31,7 @@ struct AcceptConnectionEvent : public IOEvent
     } 
     std::string remote_ip = "";
     uint16_t remote_port = 0;
+    int32_t connection_fd = -1;
 };
 
 struct RegisterConnectionEvent : public IOEvent
@@ -38,6 +39,7 @@ struct RegisterConnectionEvent : public IOEvent
     RegisterConnectionEvent() {
         event_type = REGISTER_CONNECTION;
     }
+    int32_t connection_fd = -1;
 };
 
 struct CloseConnectionRequestEvent : public IOEvent
@@ -70,9 +72,8 @@ struct ReadEvent : public IOEvent
 
 struct PacketToSend
 {
-    PacketToSend(int32_t remote_fd, uint32_t len)
+    PacketToSend(uint32_t len)
     {
-        connection_fd = remote_fd;
         packet_bytes = new char[len];
         packet_len = len;
     }
@@ -91,18 +92,15 @@ struct PacketToSend
     }
     PacketToSend &operator=(PacketToSend &&to_move)
     {
-        connection_fd = to_move.connection_fd;
         packet_bytes = to_move.packet_bytes;
         packet_len = to_move.packet_len;
         packet_offset = to_move.packet_offset;
 
-        to_move.connection_fd = -1;
         to_move.packet_bytes = nullptr;
         to_move.packet_len = 0;
         to_move.packet_offset = 0;
         return *this;
     }
-    int32_t connection_fd;
     char *packet_bytes;
     uint32_t packet_len;
     uint32_t packet_offset = 0;

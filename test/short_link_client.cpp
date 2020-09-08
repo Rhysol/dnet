@@ -3,6 +3,7 @@
 #include <unordered_set>
 #include <array>
 #include <signal.h>
+#include <chrono>
 
 using namespace dnet;
 
@@ -13,6 +14,11 @@ void WaitAWhile()
 	t.tv_sec = 0;
 	t.tv_nsec = 1000 * 1000; //1ms
 	nanosleep(&t, NULL);
+}
+
+uint64_t GetNowMs()
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 class NetPacket : public NetPacketInterface
@@ -27,11 +33,14 @@ public:
 	}
 };
 
+thread_local std::unordered_map<uint64_t, uint64_t> cost_time;
+
 class NetHandler : public NetEventInterface
 {
 public:
-	void Init(NetConfig *config)
+	void Init(NetManager *net_mgr, NetConfig *config)
 	{
+		m_net_mgr = net_mgr;
 		m_net_config = config;
 	}
     virtual NetPacketInterface *CreateNetPacket() override
@@ -41,16 +50,22 @@ public:
 	virtual void OnNewConnection(uint64_t, const std::string &, uint16_t) override
 	{
 	}
-	virtual void OnReceivePacket(uint64_t, NetPacketInterface &, uint32_t) override
+	virtual void OnReceivePacket(uint64_t connection_id, NetPacketInterface &, uint32_t) override
 	{
-		++m_count;
+		if (GetNowMs() - cost_time[connection_id] <= 3)
+		{
+            ++m_count;
+		}
+		cost_time.erase(connection_id);
+		m_net_mgr->CloseConnection(connection_id);
 	}
-    virtual void OnDisconnect(uint64_t connection_id) override
+    virtual void OnDisconnect(uint64_t) override
 	{
-		LOGI("connection: {} disconnect", connection_id);
+		//LOGI("connection: {} disconnect", connection_id);
 	}
 
 	uint32_t m_count = 0;
+	NetManager *m_net_mgr = nullptr;
 	NetConfig *m_net_config = nullptr;
 };
 
@@ -69,33 +84,38 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
 	net.Init(config, &handler);
-	handler.Init(net.GetConfig());
+	handler.Init(&net, net.GetConfig());
 	NetConfig *m_net_config = net.GetConfig();
-	uint64_t connection_id = net.ConnectTo("127.0.0.1", 18889);
-	if(connection_id <= 0)
-	{
-		LOGE("connect failed!");
-		return;
-	}
-	std::array<char, 1024> start_data = { 's', 't', 'a', 'r', 't' };
-	std::array<char, 1024> send_data = {'h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd'};
-	std::array<char, 1024> end_data = { 'e', 'n', 'd' };
+	char start_data[1024] = "start";
+	char send_data[1024] = "hello world";
+	char end_data[1024] = "end";
+	uint64_t connection_id = 0;
 	for (uint32_t i = 0; i < total_send_num; i++)
 	{
+        connection_id = net.ConnectTo("127.0.0.1", 18889);
+        if(connection_id <= 0)
+        {
+            LOGE("connect failed!");
+            return;
+        }
 		net.Update();
 		if (0 == i)
 		{
-            net.Send(connection_id, start_data.data(), start_data.max_size());
+            net.Send(connection_id, start_data, 1024);
 		}
 		else if (total_send_num - 1 == i)
 		{
-            net.Send(connection_id, end_data.data(), end_data.max_size());
+            net.Send(connection_id, end_data, 1024);
 		}
 		else
 		{
-            net.Send(connection_id, send_data.data(), send_data.max_size());
+            net.Send(connection_id, send_data, 1024);
 		}
-		WaitAWhile();
+		cost_time.emplace(connection_id, GetNowMs());
+		if (i % 50 == 0)
+		{
+            WaitAWhile();
+		}
 	}
 
 	while(handler.m_count != total_send_num && threads_switch[thread_id]->load())

@@ -56,9 +56,9 @@ void IOThread::Update()
     int epoll_event_num = 0;
     while(m_keep_alive.load())
     {
-        for (int32_t to_close_fd : m_connections_to_close)
+        for (uint64_t to_close_id : m_connections_to_close)
         {
-            CloseConnection(to_close_fd);
+            CloseConnection(to_close_id);
         }
         m_connections_to_close.clear();
         HandleIOEvent();
@@ -88,19 +88,20 @@ void IOThread::Update()
 
 void IOThread::HandleEpollEvent(const epoll_event &ev)
 {
-    auto iter = m_connections.find(ev.data.fd);
-    if (iter == m_connections.end())
+    auto iter = m_fd_2_connection.find(ev.data.fd);
+    if (iter == m_fd_2_connection.end())
     {
         LOGE("can't find fd {}", ev.data.fd);
+        return;
     }
-    Connection &connection = iter->second;
+    Connection *connection = iter->second;
     if (ev.events & EPOLLOUT)
     {
-        connection.SendRemainPacket();
+        connection->SendRemainPacket();
     }
     if (ev.events & EPOLLIN)
     {
-        connection.Receive();
+        connection->Receive();
     }
 }
 
@@ -132,7 +133,7 @@ uint32_t IOThread::HandleIOEvent()
             OnWrite((WriteEvent &)(*event));
             break;
         case IOEvent::EventType::CLOSE_CONNECTION_REQUEST:
-            CloseConnection(event->connection_fd);
+            CloseConnection(event->connection_id);
             break;
         default:
             { LOGE("unkown event type: {}", (int16_t)event->event_type); }    
@@ -148,22 +149,22 @@ uint32_t IOThread::HandleIOEvent()
 
 void IOThread::OnRegisterConnection(const RegisterConnectionEvent &io_event)
 {
-    Connection &connection = m_connections[io_event.connection_fd];
+    Connection &connection = m_id_2_connection[io_event.connection_id];
     if (connection.HasInited())
     {
-        LOGE("fd {} already exist!", io_event.connection_fd);
+        LOGE("id {} already exist!", io_event.connection_id);
         return;
     }
-    connection.Init(io_event.connection_fd, m_net_config);
+    connection.Init(io_event.connection_id, io_event.connection_fd, m_net_config);
     connection.SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
     EpollCtl(io_event.connection_fd, EPOLLIN | EPOLLOUT | EPOLLET, EPOLL_CTL_ADD);
-
+    m_fd_2_connection[io_event.connection_fd] = &connection;
 }
 
 void IOThread::OnWrite(WriteEvent &event)
 {
-    auto iter = m_connections.find(event.connection_fd);
-    if (iter != m_connections.end())
+    auto iter = m_id_2_connection.find(event.connection_id);
+    if (iter != m_id_2_connection.end())
     {
         iter->second.Send(event.packet);
     }
@@ -171,9 +172,9 @@ void IOThread::OnWrite(WriteEvent &event)
 
 void IOThread::OnCloseConnectionRequest(const CloseConnectionRequestEvent &event)
 {
-    CloseConnection(event.connection_fd);
+    CloseConnection(event.connection_id);
     CloseConnectionCompleteEvent *event_to_main_thread = new CloseConnectionCompleteEvent;
-    event_to_main_thread->connection_fd = event.connection_fd;
+    event_to_main_thread->connection_id = event.connection_id;
     Pass2MainThread(event_to_main_thread);
 }
 
@@ -181,7 +182,7 @@ void IOThread::Pass2MainThread(IOEvent *io_event)
 {
     if (io_event->event_type == IOEvent::EventType::UNEXPECTED_DISCONNECT)
     {
-        m_connections_to_close.push_back(io_event->connection_fd);
+        m_connections_to_close.push_back(io_event->connection_id);
     }
     io_event->source_thread_id = m_thread_id;
     IOEventPasser::Pass2MainThread(io_event);
@@ -192,20 +193,21 @@ void IOThread::Pass2IOThread(IOEvent *io_event)
     m_io_events.Enqueue(io_event);
 }
 
-void IOThread::CloseConnection(int32_t connection_fd)
+void IOThread::CloseConnection(uint64_t connection_id)
 {
-    auto iter = m_connections.find(connection_fd);
-    if (iter == m_connections.end()) return;
+    auto iter = m_id_2_connection.find(connection_id);
+    if (iter == m_id_2_connection.end()) return;
     iter->second.SendRemainPacket();
-    close(connection_fd);
-	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, connection_fd, NULL);
-    m_connections.erase(iter);
+    close(iter->second.GetConnectionFD());
+	epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, iter->second.GetConnectionFD(), NULL);
+    m_fd_2_connection.erase(iter->second.GetConnectionFD());
+    m_id_2_connection.erase(iter);
 }
 
 void IOThread::CloseAllConnection()
 {
     int32_t fd = -1;
-    for (auto &iter : m_connections)
+    for (auto &iter : m_id_2_connection)
     {
         iter.second.SendRemainPacket();
         fd = iter.second.GetConnectionFD();

@@ -30,5 +30,4 @@ target_link_directories(dnet
 target_link_libraries(dnet
 	PUBLIC pthread
 	PUBLIC spdlog
-	PUBLIC tcmalloc
 )

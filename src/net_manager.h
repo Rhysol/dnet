@@ -22,18 +22,19 @@ public:
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
 
-    int32_t ConnectTo(const std::string &remote_ip, uint16_t remote_port);
-    bool Send(int32_t connection_fd, const char *data_bytes, uint32_t data_len);
-    void CloseConnection(int32_t connection_fd);
+    uint64_t ConnectTo(const std::string &remote_ip, uint16_t remote_port);
+    bool Send(uint64_t connection_id, const char *data_bytes, uint32_t data_len);
+    void CloseConnection(uint64_t connection_id);
     NetConfig *GetConfig() { return m_net_config; }
 private:
     void InitThreads();
 
-    uint16_t HashToIoThread(int32_t connection_fd);
+    uint16_t HashToIoThread(uint64_t connection_id);
     virtual void Pass2MainThread(IOEvent *event) override;
-    void Pass2IOThread(IOEvent *event, uint16_t io_thread_id);
+    virtual void Pass2IOThread(IOEvent *event) override;
 
     void OnAcceptConnection(const AcceptConnectionEvent &event);
+    inline uint64_t AllocateConnectionId() { return m_next_connection_id++; }
     void OnRead(const ReadEvent &event);
     void OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event);
 
@@ -41,6 +42,7 @@ private:
     NetConfig *m_net_config = nullptr;
     ListenerThread *m_listener_thread = nullptr;
     std::vector<IOThread *> m_io_threads;
+    uint64_t m_next_connection_id = 1;
 
     MPSCQueue<IOEvent> m_events_queue;
 

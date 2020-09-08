@@ -48,7 +48,7 @@ protected:
     void OnWrite(WriteEvent &event);
     void OnCloseConnectionRequest(const CloseConnectionRequestEvent &event);
 
-    void CloseConnection(int32_t connection_fd);
+    void CloseConnection(uint64_t connection_id);
     void CloseAllConnection();
 
 protected:
@@ -62,8 +62,9 @@ protected:
 
 	int m_epoll_fd;
 	epoll_event *m_epoll_events = nullptr;
-    std::unordered_map<int32_t, Connection> m_connections;
-    std::vector<int32_t> m_connections_to_close;
+    std::unordered_map<uint64_t, Connection> m_id_2_connection;
+    std::unordered_map<uint32_t, Connection*> m_fd_2_connection;
+    std::vector<uint64_t> m_connections_to_close;
 
     SPSCQueue<IOEvent> m_io_events;
 };

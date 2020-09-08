@@ -19,34 +19,12 @@ struct ReadBuffer
             delete[] buffer;
         }
     }
-    ReadBuffer(const ReadBuffer &to_copy)
-    {
-        this->operator=(to_copy);
-    }
-    ReadBuffer &operator=(const ReadBuffer &to_copy)
-    {
-        buffer = new char[65535];
-        memcpy(buffer, to_copy.buffer, to_copy.buffer_len);
-        buffer_len = to_copy.buffer_len;
-        return *this;
-    }
-    ReadBuffer(ReadBuffer &&to_move)
-    {
-        this->operator=(std::move(to_move));
-    }
-    ReadBuffer &operator=(ReadBuffer &&to_move)
-    {
-        buffer = to_move.buffer;
-        to_move.buffer = nullptr;
-        buffer_len = to_move.buffer_len;
-        to_move.buffer_len = 0;
-        return *this;
-    }
-    inline static constexpr uint32_t BufferMaxLen() {
+    inline static constexpr uint32_t Capacity() {
         return 65535;
     }
     char *buffer;
-    int32_t buffer_len = 0;
+    int32_t size = 0;
+    int32_t offset = 0;
 };
 
 class Connection : public IOEventPasser
@@ -56,7 +34,7 @@ public:
     ~Connection();
 
     typedef std::function<NetPacketInterface *()> CreateNetPacketFunc;
-    void Init(int32_t fd, const NetConfig *net_config);
+    void Init(uint64_t id, int32_t fd, const NetConfig *net_config);
     inline bool HasInited() { return m_has_inited; }
 
     void Receive();
@@ -64,10 +42,11 @@ public:
     bool Send(PacketToSend *packet);
     //发送完所有积压的包返回true, 否则返回false
     bool SendRemainPacket();
-    int32_t GetConnectionFD() { return m_fd; }
+    inline int32_t GetConnectionFD() { return m_fd; }
 
 private:
     void ParseReadBuffer();
+    void UpdatePacketDataCapacity(NetPacketInterface *packet, const char *bytes, uint32_t bytes_len);
     ReadEvent *CreateReadEvent();
 
     bool DoSendRemainPacket();
@@ -76,6 +55,7 @@ private:
     //读或者写的过程中发现连接断开，服务器被动断开连接
     void OnUnexpectedDisconnect();
 private:
+    uint64_t m_id = 0;
     int32_t m_fd = -1;
     bool m_has_inited = false;
     bool m_to_close = false;

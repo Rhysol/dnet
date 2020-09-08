@@ -25,6 +25,18 @@ target_link_libraries(client
 	PRIVATE pthread
 )
 
+add_executable(short_link_client
+	short_link_client.cpp
+)
+target_include_directories(short_link_client
+	PRIVATE ../src
+	PRIVATE ../third_part
+)
+target_link_libraries(short_link_client
+	PRIVATE dnet
+	PRIVATE pthread
+)
+
 add_executable(spsc_queue_test
 	test_spsc_queue.cpp
 )
