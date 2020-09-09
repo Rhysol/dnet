@@ -38,7 +38,7 @@ public:
 	{
 		return new NetPacket(512);
 	}
-	virtual void OnNewConnection(uint64_t, const std::string &, uint16_t) override
+	virtual void OnAcceptConnection(uint64_t, const std::string &, uint16_t) override
 	{
 	}
 	virtual void OnReceivePacket(uint64_t, NetPacketInterface &, uint32_t) override

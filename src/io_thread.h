@@ -27,8 +27,8 @@ public:
 
     virtual bool Init(uint16_t thread_id, const NetConfig *net_config);
 
-    virtual void Pass2MainThread(IOEvent *io_event) override;
-    virtual void Pass2IOThread(IOEvent *io_event) override;
+    virtual void Pass2MainThread(io_event::IOEvent *io_event) override;
+    virtual void Pass2IOThread(io_event::IOEvent *io_event) override;
 
 protected:
     virtual void HandleEpollEvent(const epoll_event &ev);
@@ -44,9 +44,8 @@ protected:
     bool EpollCtl(int32_t fd, uint32_t events, int32_t operation);
 
     uint32_t HandleIOEvent();
-    void OnRegisterConnection(const RegisterConnectionEvent &event);
-    void OnWrite(WriteEvent &event);
-    void OnCloseConnectionRequest(const CloseConnectionRequestEvent &event);
+    void OnRegisterConnection(const io_event::RegisterConnection &event);
+    void OnSendAPacket(io_event::SendAPacket&event);
 
     void CloseConnection(uint64_t connection_id);
     void CloseAllConnection();
@@ -66,7 +65,7 @@ protected:
     std::unordered_map<uint32_t, Connection*> m_fd_2_connection;
     std::vector<uint64_t> m_connections_to_close;
 
-    SPSCQueue<IOEvent> m_io_events;
+    SPSCQueue<io_event::IOEvent> m_io_events;
 };
 
 }

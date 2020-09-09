@@ -122,7 +122,7 @@ void ListenerThread::OnAccept()
 		return;
 	}
 
-    AcceptConnectionEvent *event = new AcceptConnectionEvent; //在net_manager内被删除
+    io_event::AcceptConnection *event = new io_event::AcceptConnection; //在net_manager内被删除
     event->connection_fd = client_fd;
     event->remote_ip = inet_ntoa(client_addr.sin_addr);
     event->remote_port = ntohs(client_addr.sin_port);

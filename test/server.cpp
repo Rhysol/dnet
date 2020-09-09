@@ -45,7 +45,7 @@ public:
 	{
 		return new NetPacket(512);
 	}
-	virtual void OnNewConnection(uint64_t connection_id, const std::string &ip, uint16_t port) override
+	virtual void OnAcceptConnection(uint64_t connection_id, const std::string &ip, uint16_t port) override
 	{
 		LOGI("new connection, ip: {}:{}", ip, port);
 		connected_id.emplace(connection_id);

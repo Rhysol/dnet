@@ -4,72 +4,6 @@
 namespace dnet
 {
 
-struct IOEvent
-{
-    enum EventType 
-    {
-        //跨线程事件，io线程和主线程之间
-        ACCEPT_CONNECTION, //listener线程接收了新链接，通知到主线程
-        REGISTER_CONNECTION, //主线程把新的链接注册到io线程，由io线程进行io操作
-        CLOSE_CONNECTION_REQUEST, //主线程向io线程请求关闭链接
-        CLOSE_CONNECTION_COMPLETE, //io线程完成关闭链接，通知到主线程
-        READ,   //io线程读取了一个完整的网络包，发送给主线程
-        WRITE,  //主线程把要发送给指定链接的网络包传给io线程，由io线程进行发送
-        UNEXPECTED_DISCONNECT, //读或写的过程中发现链接意外断开
-        WRITE_EAGAIN, //写的过程中出现EAGAIN
-    };
-    virtual ~IOEvent() {}
-    EventType event_type;
-    uint16_t source_thread_id = -1;
-    uint64_t connection_id = 0;
-};
-
-struct AcceptConnectionEvent : public IOEvent
-{
-    AcceptConnectionEvent() {
-        event_type = ACCEPT_CONNECTION;
-    } 
-    std::string remote_ip = "";
-    uint16_t remote_port = 0;
-    int32_t connection_fd = -1;
-};
-
-struct RegisterConnectionEvent : public IOEvent
-{
-    RegisterConnectionEvent() {
-        event_type = REGISTER_CONNECTION;
-    }
-    int32_t connection_fd = -1;
-};
-
-struct CloseConnectionRequestEvent : public IOEvent
-{
-    CloseConnectionRequestEvent() {
-        event_type = CLOSE_CONNECTION_REQUEST;
-    }
-};
-
-struct CloseConnectionCompleteEvent : public IOEvent
-{
-    CloseConnectionCompleteEvent() {
-        event_type = CLOSE_CONNECTION_COMPLETE;
-    }
-};
-
-struct ReadEvent : public IOEvent
-{
-    ReadEvent() {
-        event_type = READ;
-    }
-    ~ReadEvent() {
-        if (packet != nullptr)
-        {
-            delete packet;
-        }
-    }
-    NetPacketInterface *packet = nullptr;
-}; 
-
 struct PacketToSend
 {
     PacketToSend(uint32_t len)
@@ -106,12 +40,62 @@ struct PacketToSend
     uint32_t packet_offset = 0;
 };
 
-struct WriteEvent : public IOEvent
+namespace io_event
 {
-    WriteEvent() {
-        event_type = WRITE;
+
+enum EventType 
+{
+    //跨线程事件，io线程和主线程之间
+    ACCEPT_CONNECTION, //listener线程接收了新链接，通知到主线程
+    REGISTER_CONNECTION, //主线程把新的链接注册到io线程，由io线程进行io操作
+    CLOSE_CONNECTION_REQUEST, //主线程向io线程请求关闭链接
+    RECEIVE_A_PACKET,   //io线程读取了一个完整的网络包，发送给主线程
+    SEND_A_PACKET,  //主线程把要发送给指定链接的网络包传给io线程，由io线程进行发送
+    UNEXPECTED_DISCONNECT, //读或写的过程中发现链接意外断开
+    NON_BLOCKING_CONNECT_RESULT, //发起的非阻塞连接结果
+};
+
+struct IOEvent
+{
+    IOEvent(EventType event_type) : event_type(event_type){}
+    virtual ~IOEvent() {}
+    EventType event_type;
+    uint16_t source_thread_id = -1;
+    uint64_t connection_id = 0;
+};
+
+struct AcceptConnection : public IOEvent
+{
+    AcceptConnection() : IOEvent(ACCEPT_CONNECTION) {} 
+    std::string remote_ip = "";
+    uint16_t remote_port = 0;
+    int32_t connection_fd = -1;
+};
+
+struct RegisterConnection : public IOEvent
+{
+    RegisterConnection() : IOEvent(REGISTER_CONNECTION) {}
+    int32_t connection_fd = -1;
+    bool connected = true;
+};
+
+struct ReceiveAPacket : public IOEvent
+{
+    ReceiveAPacket() : IOEvent(RECEIVE_A_PACKET) {}
+    ~ReceiveAPacket() {
+        if (packet != nullptr)
+        {
+            delete packet;
+        }
     }
-    ~WriteEvent() {
+    NetPacketInterface *packet = nullptr;
+}; 
+
+
+struct SendAPacket : public IOEvent
+{
+    SendAPacket() : IOEvent(SEND_A_PACKET) {}
+    ~SendAPacket() {
         if (packet != nullptr)
         {
             delete packet;
@@ -120,19 +104,13 @@ struct WriteEvent : public IOEvent
     PacketToSend *packet = nullptr;
 };
 
-struct UnexpectedDisconnectEvent : public IOEvent
+struct NonBlockingConnectResult : public IOEvent
 {
-    UnexpectedDisconnectEvent() {
-        event_type = UNEXPECTED_DISCONNECT;
-    }
+    NonBlockingConnectResult () : IOEvent(NON_BLOCKING_CONNECT_RESULT) {}
+    bool is_success = true;
 };
 
-struct WriteEagainEvent : public IOEvent
-{
-    WriteEagainEvent () {
-        event_type = WRITE_EAGAIN;
-    }
-};
+}   //namespace io_event
 
 class IOEventPasser
 {
@@ -157,13 +135,13 @@ public:
         }
     }
 
-    virtual void Pass2IOThread(IOEvent *event)
+    virtual void Pass2IOThread(io_event::IOEvent *event)
     {
         if (!event || !m_next_passer_2_io_thread) return;
         m_next_passer_2_io_thread->Pass2IOThread(event);
     }
 
-    virtual void Pass2MainThread(IOEvent *event)
+    virtual void Pass2MainThread(io_event::IOEvent *event)
     {
         if (!event || !m_next_passer_2_main_thread) return;
         m_next_passer_2_main_thread->Pass2MainThread(event);

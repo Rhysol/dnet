@@ -74,7 +74,9 @@ class NetEventInterface
 public:
     //告诉net_manager如何创建NetPacket，使用者自定义
     virtual NetPacketInterface *CreateNetPacket() = 0;
-    virtual void OnNewConnection(uint64_t connection_id, const std::string &ip, uint16_t port) = 0;
+    virtual void OnAcceptConnection(uint64_t connection_id, const std::string &ip, uint16_t port) = 0;
+    //NetManager::ConnectTo接口的结果通知
+    virtual void AsyncConnectResult(uint64_t /*connection_id*/, bool /*result*/) {};
     virtual void OnReceivePacket(uint64_t connection_id, NetPacketInterface &packet, uint32_t thread_id) = 0;
     virtual void OnDisconnect(uint64_t connection_id) = 0;
 };

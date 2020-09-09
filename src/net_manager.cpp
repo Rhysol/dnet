@@ -84,24 +84,23 @@ void NetManager::Stop()
 uint32_t NetManager::Update()
 {
     g_dnet_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    IOEvent *event = m_events_queue.Dequeue();
+    io_event::IOEvent *event = m_events_queue.Dequeue();
     uint16_t handle_count = 0;
     while (event != nullptr)
     {
         switch (event->event_type)
         {
-        case IOEvent::EventType::ACCEPT_CONNECTION:
-            OnAcceptConnection((AcceptConnectionEvent &)(*event));
+        case io_event::EventType::ACCEPT_CONNECTION:
+            OnAcceptConnection(*(io_event::AcceptConnection *)event);
             break;
-        case IOEvent::EventType::READ:
-            OnRead((ReadEvent &)(*event));
+        case io_event::EventType::RECEIVE_A_PACKET:
+            OnReceiveAPacket(*(io_event::ReceiveAPacket *)event);
             break;
-        case IOEvent::EventType::UNEXPECTED_DISCONNECT:
-        case IOEvent::EventType::CLOSE_CONNECTION_COMPLETE:
-            OnCloseConnectionComplete((CloseConnectionCompleteEvent &)(*event));
+        case io_event::EventType::UNEXPECTED_DISCONNECT:
+            OnDisconnect(event->connection_id);
             break;
-        case IOEvent::EventType::WRITE_EAGAIN:
-            break;
+        case io_event::EventType::NON_BLOCKING_CONNECT_RESULT:
+            OnAsyncConnectResult(*(io_event::NonBlockingConnectResult *)event);
         default:
             { LOGE("unkown event type{}", (int16_t)event->event_type); }
             break;
@@ -115,27 +114,33 @@ uint32_t NetManager::Update()
 }
 
 //从listener thread接收的新连接
-void NetManager::OnAcceptConnection(const AcceptConnectionEvent &event)
+void NetManager::OnAcceptConnection(const io_event::AcceptConnection &event)
 {
-    RegisterConnectionEvent *register_event = new RegisterConnectionEvent;
+    io_event::RegisterConnection *register_event = new io_event::RegisterConnection;
     register_event->connection_fd = event.connection_fd; 
     uint64_t connection_id = AllocateConnectionId();
     register_event->connection_id = connection_id;
+    register_event->connected = true;
     Pass2IOThread(register_event);
-    m_net_event_handler->OnNewConnection(connection_id, event.remote_ip, event.remote_port);
+    m_net_event_handler->OnAcceptConnection(connection_id, event.remote_ip, event.remote_port);
 }
 
-void NetManager::OnRead(const ReadEvent &event)
+void NetManager::OnReceiveAPacket(const io_event::ReceiveAPacket &event)
 {
     m_net_event_handler->OnReceivePacket(event.connection_id, *event.packet, event.source_thread_id);
 }
 
-void NetManager::OnCloseConnectionComplete(const CloseConnectionCompleteEvent &event)
+void NetManager::OnDisconnect(uint64_t connection_id)
 {
-    m_net_event_handler->OnDisconnect(event.connection_id);
+    m_net_event_handler->OnDisconnect(connection_id);
 }
 
-uint64_t NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port)
+void NetManager::OnAsyncConnectResult(const io_event::NonBlockingConnectResult &event)
+{
+    m_net_event_handler->AsyncConnectResult(event.connection_id, event.is_success);
+}
+
+uint64_t NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_port, bool async)
 {
     sockaddr_in remote_addr;
     remote_addr.sin_family = AF_INET;
@@ -147,23 +152,47 @@ uint64_t NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_por
     remote_addr.sin_port = htons(remote_port);
 
     int fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (connect(fd, (sockaddr *)&remote_addr, sizeof(sockaddr)) == -1)
+    uint64_t connection_id = -1;
+    if (async ? NonBlockingConnect(fd, remote_addr, remote_ip, remote_port) : BlockingConnect(fd, remote_addr, remote_ip, remote_port))
+    {
+        connection_id = AllocateConnectionId();
+        io_event::RegisterConnection *event = new io_event::RegisterConnection;
+        event->connection_fd = fd; 
+        event->connection_id = connection_id;
+        event->connected = !async;
+        Pass2IOThread(event);
+    }
+    return connection_id;
+}
+
+bool NetManager::BlockingConnect(int32_t connection_fd, sockaddr_in &remote_addr, const std::string &remote_ip, uint16_t remote_port)
+{
+    if (connect(connection_fd, (sockaddr *)&remote_addr, sizeof(sockaddr)) == -1)
     {
         LOGE("connect to: {}:{} failed! errno: {}", remote_ip, remote_port, errno);
-        return -1;
+        return false;
     }
-
-    if (fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK) == -1)
+    if (fcntl(connection_fd, F_SETFL, fcntl(connection_fd, F_GETFL, 0) | O_NONBLOCK) == -1)
     {
         LOGE("set to nonblock failed! errno: {}", errno);
-        return -1;
+        return false;
     }
-    uint64_t connection_id = AllocateConnectionId();
-    RegisterConnectionEvent *event = new RegisterConnectionEvent;
-    event->connection_fd = fd; 
-    event->connection_id = connection_id;
-    Pass2IOThread(event);
-    return connection_id;
+    return true;
+}
+
+bool NetManager::NonBlockingConnect(int32_t connection_fd, sockaddr_in &remote_addr, const std::string &remote_ip, uint16_t remote_port)
+{
+    if (fcntl(connection_fd, F_SETFL, fcntl(connection_fd, F_GETFL, 0) | O_NONBLOCK) == -1)
+    {
+        LOGE("set to nonblock failed! errno: {}", errno);
+        return false;
+    }
+    else if (connect(connection_fd, (sockaddr *)&remote_addr, sizeof(sockaddr)) == -1 && errno != EINPROGRESS)
+    {
+        LOGE("connect to: {}:{} failed! errno: {}", remote_ip, remote_port, errno);
+        return false;
+    }
+    return true;
 }
 
 bool NetManager::Send(uint64_t connection_id, const char *data_bytes, uint32_t data_len)
@@ -173,7 +202,7 @@ bool NetManager::Send(uint64_t connection_id, const char *data_bytes, uint32_t d
         LOGW("connection_id: {} send data length is 0", connection_id);
         return false;
     }
-    WriteEvent *event = new WriteEvent;
+    io_event::SendAPacket *event = new io_event::SendAPacket;
     event->connection_id = connection_id;
     event->packet = new PacketToSend(data_len);
     memcpy(event->packet->packet_bytes, data_bytes, data_len);
@@ -183,7 +212,7 @@ bool NetManager::Send(uint64_t connection_id, const char *data_bytes, uint32_t d
 
 void NetManager::CloseConnection(uint64_t connection_id)
 {
-    CloseConnectionRequestEvent *event = new CloseConnectionRequestEvent;
+    io_event::IOEvent *event = new io_event::IOEvent(io_event::EventType::CLOSE_CONNECTION_REQUEST);
     event->connection_id = connection_id;
     Pass2IOThread(event);
 }
@@ -194,12 +223,12 @@ uint16_t NetManager::HashToIoThread(uint64_t connection_id)
     return thread_id;
 }
 
-void NetManager::Pass2MainThread(IOEvent *event)
+void NetManager::Pass2MainThread(io_event::IOEvent *event)
 {
     m_events_queue.Enqueue(event, event->source_thread_id);
 }
 
-void NetManager::Pass2IOThread(IOEvent *event)
+void NetManager::Pass2IOThread(io_event::IOEvent *event)
 {
     uint16_t io_thread_id = HashToIoThread(event->connection_id);
     m_io_threads[io_thread_id]->Pass2IOThread(event);

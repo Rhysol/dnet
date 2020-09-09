@@ -18,9 +18,9 @@ Connection::Connection()
 
 Connection::~Connection()
 {
-    if (m_unfinished_read)
+    if (m_incomplete_receive)
     {
-        delete m_unfinished_read;
+        delete m_incomplete_receive;
     }
     for (PacketToSend *packet : m_packet_to_send)
     {
@@ -64,11 +64,11 @@ void Connection::Receive()
 
 void Connection::ParseReadBuffer()
 {
-    if (!m_unfinished_read)
+    if (!m_incomplete_receive)
     {
-        m_unfinished_read = CreateReadEvent();
+        m_incomplete_receive = CreateReceiveAPacketEvent();
     }
-    NetPacketInterface *packet = m_unfinished_read->packet;
+    NetPacketInterface *packet = m_incomplete_receive->packet;
 
     uint32_t len_to_read = 0;
     while (m_read_buffer.offset != m_read_buffer.size)
@@ -81,9 +81,9 @@ void Connection::ParseReadBuffer()
         if (packet->data_capacity_adjusted_success &&
             packet->data_size == packet->data_capacity)
         {
-            Pass2MainThread(m_unfinished_read);
-            m_unfinished_read = CreateReadEvent();
-            packet = m_unfinished_read->packet;
+            Pass2MainThread(m_incomplete_receive);
+            m_incomplete_receive = CreateReceiveAPacketEvent();
+            packet = m_incomplete_receive->packet;
         }
     }
     m_read_buffer.offset = 0;
@@ -121,9 +121,9 @@ void Connection::UpdatePacketDataCapacity(NetPacketInterface *packet, const char
     }
 }
 
-ReadEvent *Connection::CreateReadEvent()
+io_event::ReceiveAPacket *Connection::CreateReceiveAPacketEvent()
 {
-    ReadEvent *event = new ReadEvent();
+    io_event::ReceiveAPacket *event = new io_event::ReceiveAPacket();
     event->packet = m_net_config->create_net_packet_func();
     event->connection_id = m_id;
     return event;
@@ -133,7 +133,7 @@ void Connection::OnUnexpectedDisconnect()
 {
     if (m_to_close) return;
     m_to_close = true;
-    UnexpectedDisconnectEvent *event = new UnexpectedDisconnectEvent;
+    io_event::IOEvent *event = new io_event::IOEvent(io_event::EventType::UNEXPECTED_DISCONNECT);
     event->connection_id = m_id;
     Pass2MainThread(event);
 }
@@ -174,11 +174,7 @@ bool Connection::DoSendRemainPacket()
         write_len = send(m_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
         if (write_len == -1)
         {
-            if (EAGAIN == errno)
-            {
-                OnWriteEagain();
-            }
-            else
+            if (EAGAIN != errno)
             {
                 OnUnexpectedDisconnect();
             }
@@ -196,11 +192,4 @@ bool Connection::DoSendRemainPacket()
         }
     }
     return m_packet_to_send.empty();
-}
-
-void Connection::OnWriteEagain()
-{
-    WriteEagainEvent *event = new WriteEagainEvent;
-    event->connection_id = m_id;
-    Pass2MainThread(event);
 }
