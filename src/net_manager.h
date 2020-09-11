@@ -29,7 +29,7 @@ public:
     void CloseConnection(uint64_t connection_id);
     NetConfig *GetConfig() { return m_net_config; }
 private:
-    void InitThreads();
+    bool InitThreads();
 
     bool BlockingConnect(int32_t connection_fd, sockaddr_in &remote_addr, const std::string &remote_ip, uint16_t remote_port);
     bool NonBlockingConnect(int32_t connection_fd, sockaddr_in &remote_addr, const std::string &remote_ip, uint16_t remote_port);
@@ -42,7 +42,7 @@ private:
     inline uint64_t AllocateConnectionId() { return m_next_connection_id++; }
     void OnReceiveAPacket(const io_event::ReceiveAPacket &event);
     void OnDisconnect(uint64_t connection_id);
-    void OnAsyncConnectResult(const io_event::NonBlockingConnectResult &event);
+    void OnAsyncConnectResult(const io_event::AsyncConnectResult &event);
 private:
     NetConfig *m_net_config = nullptr;
     ListenerThread *m_listener_thread = nullptr;

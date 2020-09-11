@@ -38,20 +38,23 @@ bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
     m_net_config = new NetConfig(config);
     m_net_config->logger = spdlog::hourly_logger_mt<spdlog::async_factory>(m_net_config->logger_name, m_net_config->log_path);
     m_net_config->create_net_packet_func = std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler);
-    m_events_queue.Init(m_net_config->io_thread_num),
-    InitThreads();
+    m_events_queue.Init(m_net_config->io_thread_num);
+    if(!InitThreads())
+    {
+        return false;
+    }
     LOGI("start success");
     return true;
 }
 
-void NetManager::InitThreads()
+bool NetManager::InitThreads()
 {
     uint16_t i = 0;
     if (m_net_config->need_listener)
     {
         m_io_threads.push_back(new ListenerThread);
         m_listener_thread = dynamic_cast<ListenerThread *>(m_io_threads[0]);
-        m_listener_thread->Init(0, m_net_config);
+        if (!m_listener_thread->Init(0, m_net_config)) return false;
         m_listener_thread->SetNextPasser(this, IOEventPasser::EDestination::MAIN_THREAD);
         ++i;
     }
@@ -68,6 +71,7 @@ void NetManager::InitThreads()
     {
         thread->Start();
     }
+    return true;
 }
 
 void NetManager::Stop()
@@ -99,10 +103,11 @@ uint32_t NetManager::Update()
         case io_event::EventType::UNEXPECTED_DISCONNECT:
             OnDisconnect(event->connection_id);
             break;
-        case io_event::EventType::NON_BLOCKING_CONNECT_RESULT:
-            OnAsyncConnectResult(*(io_event::NonBlockingConnectResult *)event);
+        case io_event::EventType::ASYNC_CONNECT_RESULT:
+            OnAsyncConnectResult(*(io_event::AsyncConnectResult*)event);
+            break;
         default:
-            { LOGE("unkown event type{}", (int16_t)event->event_type); }
+            { LOGE("unkown event type {}", (int16_t)event->event_type); }
             break;
         }
         delete event;//由io_event_pipe创建
@@ -120,7 +125,6 @@ void NetManager::OnAcceptConnection(const io_event::AcceptConnection &event)
     register_event->connection_fd = event.connection_fd; 
     uint64_t connection_id = AllocateConnectionId();
     register_event->connection_id = connection_id;
-    register_event->connected = true;
     Pass2IOThread(register_event);
     m_net_event_handler->OnAcceptConnection(connection_id, event.remote_ip, event.remote_port);
 }
@@ -135,7 +139,7 @@ void NetManager::OnDisconnect(uint64_t connection_id)
     m_net_event_handler->OnDisconnect(connection_id);
 }
 
-void NetManager::OnAsyncConnectResult(const io_event::NonBlockingConnectResult &event)
+void NetManager::OnAsyncConnectResult(const io_event::AsyncConnectResult &event)
 {
     m_net_event_handler->AsyncConnectResult(event.connection_id, event.is_success);
 }
@@ -159,7 +163,7 @@ uint64_t NetManager::ConnectTo(const std::string &remote_ip, uint16_t remote_por
         io_event::RegisterConnection *event = new io_event::RegisterConnection;
         event->connection_fd = fd; 
         event->connection_id = connection_id;
-        event->connected = !async;
+        event->is_async = async;
         Pass2IOThread(event);
     }
     return connection_id;
@@ -202,10 +206,9 @@ bool NetManager::Send(uint64_t connection_id, const char *data_bytes, uint32_t d
         LOGW("connection_id: {} send data length is 0", connection_id);
         return false;
     }
-    io_event::SendAPacket *event = new io_event::SendAPacket;
+    io_event::SendAPacket *event = new io_event::SendAPacket(data_len);
     event->connection_id = connection_id;
-    event->packet = new PacketToSend(data_len);
-    memcpy(event->packet->packet_bytes, data_bytes, data_len);
+    memcpy(event->packet_bytes.data(), data_bytes, data_len);
     Pass2IOThread(event);
     return true;
 }

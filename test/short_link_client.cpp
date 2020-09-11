@@ -50,11 +50,37 @@ public:
 	virtual void OnAcceptConnection(uint64_t, const std::string &, uint16_t) override
 	{
 	}
+    virtual void AsyncConnectResult(uint64_t connection_id, bool result) override
+	{
+		if (result)
+		{
+			++m_success_connection_count;
+            LOGI("async connection: {} success", connection_id);
+            if (0 == m_success_connection_count)
+            {
+                m_net_mgr->Send(connection_id, start_data, 1024);
+            }
+            else if (total_send_num == m_success_connection_count)
+            {
+                m_net_mgr->Send(connection_id, end_data, 1024);
+            }
+            else
+            {
+                m_net_mgr->Send(connection_id, send_data, 1024);
+            }
+            cost_time.emplace(connection_id, GetNowMs());
+		}
+		else
+		{
+            LOGI("async connection: {} failed", connection_id);
+		}
+	}
 	virtual void OnReceivePacket(uint64_t connection_id, NetPacketInterface &, uint32_t) override
 	{
-		if (GetNowMs() - cost_time[connection_id] <= 3)
+        ++m_count;
+		if (GetNowMs() - cost_time[connection_id] <= 3000)
 		{
-            ++m_count;
+			++m_intime_count;
 		}
 		cost_time.erase(connection_id);
 		m_net_mgr->CloseConnection(connection_id);
@@ -64,7 +90,13 @@ public:
 		//LOGI("connection: {} disconnect", connection_id);
 	}
 
+	char start_data[1024] = "start";
+	char send_data[1024] = "hello world";
+	char end_data[1024] = "end";
+	uint32_t total_send_num = 0;
 	uint32_t m_count = 0;
+	uint32_t m_intime_count = 0;
+	uint32_t m_success_connection_count = 0;
 	NetManager *m_net_mgr = nullptr;
 	NetConfig *m_net_config = nullptr;
 };
@@ -83,35 +115,23 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path = "log/client_thread_";
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
-	net.Init(config, &handler);
+	if (!net.Init(config, &handler))
+	{
+		return;
+	}
 	handler.Init(&net, net.GetConfig());
+	handler.total_send_num = total_send_num;
 	NetConfig *m_net_config = net.GetConfig();
-	char start_data[1024] = "start";
-	char send_data[1024] = "hello world";
-	char end_data[1024] = "end";
 	uint64_t connection_id = 0;
 	for (uint32_t i = 0; i < total_send_num; i++)
 	{
-        connection_id = net.ConnectTo("127.0.0.1", 18889);
+        connection_id = net.ConnectTo("127.0.0.1", 18889, true);
         if(connection_id <= 0)
         {
             LOGE("connect failed!");
             return;
         }
 		net.Update();
-		if (0 == i)
-		{
-            net.Send(connection_id, start_data, 1024);
-		}
-		else if (total_send_num - 1 == i)
-		{
-            net.Send(connection_id, end_data, 1024);
-		}
-		else
-		{
-            net.Send(connection_id, send_data, 1024);
-		}
-		cost_time.emplace(connection_id, GetNowMs());
 		if (i % 50 == 0)
 		{
             WaitAWhile();
@@ -124,7 +144,7 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 		WaitAWhile();
 	}
 	net.Stop();
-	LOGI("thread: {} success count: {}", thread_id, handler.m_count);
+	LOGI("thread: {} success_count: {}, intime_count: {}, success_connection: {}", thread_id, handler.m_count, handler.m_intime_count, handler.m_success_connection_count);
 }
 
 void handle_sig(int sig)

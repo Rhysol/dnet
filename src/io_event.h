@@ -1,44 +1,36 @@
 #pragma once
 #include "net_interface.h"
+#include <vector>
 
 namespace dnet
 {
 
-struct PacketToSend
-{
-    PacketToSend(uint32_t len)
-    {
-        packet_bytes = new char[len];
-        packet_len = len;
-    }
-    ~PacketToSend() 
-    {
-        if (packet_bytes != nullptr)
-        {
-            delete[] packet_bytes;
-        }
-    }
-    PacketToSend(const PacketToSend &to_copy) = delete;
-    PacketToSend &operator=(const PacketToSend &to_copy) = delete;
-    PacketToSend(PacketToSend &&to_move)
-    {
-        this->operator=(std::move(to_move));
-    }
-    PacketToSend &operator=(PacketToSend &&to_move)
-    {
-        packet_bytes = to_move.packet_bytes;
-        packet_len = to_move.packet_len;
-        packet_offset = to_move.packet_offset;
-
-        to_move.packet_bytes = nullptr;
-        to_move.packet_len = 0;
-        to_move.packet_offset = 0;
-        return *this;
-    }
-    char *packet_bytes;
-    uint32_t packet_len;
-    uint32_t packet_offset = 0;
-};
+//struct PacketToSend
+//{
+//    PacketToSend(uint32_t len)
+//    {
+//        packet_bytes.resize(len);
+//    }
+//    ~PacketToSend() 
+//    {
+//    }
+//    PacketToSend(const PacketToSend &to_copy) = delete;
+//    PacketToSend &operator=(const PacketToSend &to_copy) = delete;
+//    PacketToSend(PacketToSend &&to_move)
+//    {
+//        this->operator=(std::move(to_move));
+//    }
+//    PacketToSend &operator=(PacketToSend &&to_move)
+//    {
+//        packet_bytes = std::move(to_move.packet_bytes);
+//        packet_offset = to_move.packet_offset;
+//
+//        to_move.packet_offset = 0;
+//        return *this;
+//    }
+//    std::vector<char> packet_bytes;
+//    uint32_t packet_offset = 0;
+//};
 
 namespace io_event
 {
@@ -47,12 +39,12 @@ enum EventType
 {
     //跨线程事件，io线程和主线程之间
     ACCEPT_CONNECTION, //listener线程接收了新链接，通知到主线程
-    REGISTER_CONNECTION, //主线程把新的链接注册到io线程，由io线程进行io操作
+    REGISTER_CONNECTION, //主线程把链接注册到io线程，由io线程进行io操作
     CLOSE_CONNECTION_REQUEST, //主线程向io线程请求关闭链接
     RECEIVE_A_PACKET,   //io线程读取了一个完整的网络包，发送给主线程
     SEND_A_PACKET,  //主线程把要发送给指定链接的网络包传给io线程，由io线程进行发送
     UNEXPECTED_DISCONNECT, //读或写的过程中发现链接意外断开
-    NON_BLOCKING_CONNECT_RESULT, //发起的非阻塞连接结果
+    ASYNC_CONNECT_RESULT, //发起的非阻塞连接结果
 };
 
 struct IOEvent
@@ -76,7 +68,7 @@ struct RegisterConnection : public IOEvent
 {
     RegisterConnection() : IOEvent(REGISTER_CONNECTION) {}
     int32_t connection_fd = -1;
-    bool connected = true;
+    bool is_async = false;
 };
 
 struct ReceiveAPacket : public IOEvent
@@ -94,19 +86,13 @@ struct ReceiveAPacket : public IOEvent
 
 struct SendAPacket : public IOEvent
 {
-    SendAPacket() : IOEvent(SEND_A_PACKET) {}
-    ~SendAPacket() {
-        if (packet != nullptr)
-        {
-            delete packet;
-        }
-    }
-    PacketToSend *packet = nullptr;
+    SendAPacket(uint32_t packet_len) : IOEvent(SEND_A_PACKET), packet_bytes(packet_len) {}
+    std::vector<char> packet_bytes;
 };
 
-struct NonBlockingConnectResult : public IOEvent
+struct AsyncConnectResult : public IOEvent
 {
-    NonBlockingConnectResult () : IOEvent(NON_BLOCKING_CONNECT_RESULT) {}
+    AsyncConnectResult() : IOEvent(ASYNC_CONNECT_RESULT) {}
     bool is_success = true;
 };
 

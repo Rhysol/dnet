@@ -68,7 +68,7 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path = "log/client_thread_";
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
-	net.Init(config, &handler);
+	if (!net.Init(config, &handler)) return;
 	handler.Init(net.GetConfig());
 	NetConfig *m_net_config = net.GetConfig();
 	uint64_t connection_id = net.ConnectTo("127.0.0.1", 18889);

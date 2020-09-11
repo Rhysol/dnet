@@ -28,8 +28,7 @@ bool ListenerThread::Init(uint16_t thread_id, const NetConfig *net_config)
     if(!IOThread::Init(thread_id, net_config)) return false;
     if (!StartListen()) return false;
 
-    //把listener_fd注册到epoll
-    if (!EpollCtl(m_listener_fd, EPOLLIN, EPOLL_CTL_ADD))
+	if (!EpollCtl(m_listener_fd, EPOLLIN, EPOLL_CTL_ADD))
     {
         LOGE("register listen event to epoll failed!");
         return false;
@@ -58,7 +57,7 @@ bool ListenerThread::StartListen()
 	}
 	linger linger_val;
 	linger_val.l_onoff = 1;
-	linger_val.l_linger = 3;
+	linger_val.l_linger = 5;
 	if (setsockopt(m_listener_fd, SOL_SOCKET, SO_LINGER, (void *)&linger_val, sizeof(linger)) == -1)
 	{
 		LOGE("set listener_fd linger failed, errno: {}", errno);
@@ -66,12 +65,12 @@ bool ListenerThread::StartListen()
 	}
 	if (bind(m_listener_fd, (sockaddr *)&server_addr, sizeof(sockaddr)) == -1)
 	{
-		LOGE("bind listener fd failed");
+		LOGE("bind listener fd failed, errno: {}", errno);
 		return false;
 	}
-	if (listen(m_listener_fd, m_net_config->listen_queue_max_num) == -1)
+	if (listen(m_listener_fd, SOMAXCONN) == -1)
 	{
-		LOGE("listen failed!");
+		LOGE("listen failed!, errno: {}", errno);
 		return false;
 	}
 
@@ -103,7 +102,7 @@ void ListenerThread::OnAccept()
 	}
 	linger linger_val;
 	linger_val.l_onoff = 1;
-	linger_val.l_linger = 3;
+	linger_val.l_linger = 0;
 	if (setsockopt(client_fd, SOL_SOCKET, SO_LINGER, (void *)&linger_val, sizeof(linger)) == -1)
 	{
 		LOGE("set client_fd linger failed, errno: {}", errno);
@@ -115,12 +114,12 @@ void ListenerThread::OnAccept()
 		LOGE("set client_fd SO_REUSEADDR failed, errno: {}", errno);
 		return;
 	}
-	int32_t nodelay = 1;
-	if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&nodelay, sizeof(int32_t)) == -1)
-	{
-		LOGE("set client_fd TCP_NODELAY failed, errno: {}", errno);
-		return;
-	}
+	//int32_t nodelay = 1;
+	//if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&nodelay, sizeof(int32_t)) == -1)
+	//{
+	//	LOGE("set client_fd TCP_NODELAY failed, errno: {}", errno);
+	//	return;
+	//}
 
     io_event::AcceptConnection *event = new io_event::AcceptConnection; //在net_manager内被删除
     event->connection_fd = client_fd;

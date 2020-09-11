@@ -9,7 +9,7 @@
 
 using namespace dnet;
 
-thread_local ReadBuffer Connection::m_read_buffer;
+//thread_local ReadBuffer Connection::m_read_buffer;
 
 Connection::Connection()
 {
@@ -21,10 +21,6 @@ Connection::~Connection()
     if (m_incomplete_receive)
     {
         delete m_incomplete_receive;
-    }
-    for (PacketToSend *packet : m_packet_to_send)
-    {
-        delete packet;
     }
 }
 
@@ -138,9 +134,10 @@ void Connection::OnUnexpectedDisconnect()
     Pass2MainThread(event);
 }
 
-bool Connection::Send(PacketToSend *packet)
+void Connection::Send(std::vector<char> &packet_bytes)
 {
-    m_packet_to_send.push_back(new PacketToSend(std::move(*packet)));
+    m_packet_to_send.push_back(std::move(packet_bytes));
+    if (!m_connected) return;
     if (m_can_send)
     {
         DoSendRemainPacket();
@@ -151,26 +148,26 @@ bool Connection::Send(PacketToSend *packet)
         LOGW("fd: {} unsended packet more than {}, close connection!", m_fd, m_net_config->max_unfinished_send_packet);
         OnUnexpectedDisconnect();
     }
-    return m_packet_to_send.empty();
 }
 
-bool Connection::SendRemainPacket()
+void Connection::SendRemainPacket()
 {
+    if (!m_connected) return;
     m_can_send = true;
-    return DoSendRemainPacket();
+    DoSendRemainPacket();
 }
 
-bool Connection::DoSendRemainPacket()
+void Connection::DoSendRemainPacket()
 {
-    PacketToSend *packet = nullptr;
+    std::vector<char> *packet_bytes = nullptr;
     const char *bytes_to_write = 0;
     int32_t len_to_write = 0;
     int32_t write_len = 0;
     while (m_packet_to_send.size() != 0)
     {
-        packet = m_packet_to_send.front();
-        bytes_to_write = packet->packet_bytes + packet->packet_offset;
-        len_to_write = packet->packet_len - packet->packet_offset;
+        packet_bytes = &m_packet_to_send.front();
+        bytes_to_write = packet_bytes->data() + m_packet_offset;
+        len_to_write = packet_bytes->size() - m_packet_offset;
         write_len = send(m_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
         if (write_len == -1)
         {
@@ -184,12 +181,11 @@ bool Connection::DoSendRemainPacket()
         else if (len_to_write == write_len)
         {
             m_packet_to_send.pop_front();
-            delete packet;
+            m_packet_offset = 0;
         }
         else
         {
-            packet->packet_offset += write_len;
+            m_packet_offset += write_len;
         }
     }
-    return m_packet_to_send.empty();
 }

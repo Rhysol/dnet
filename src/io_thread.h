@@ -42,13 +42,15 @@ public:
 
 protected:
     bool EpollCtl(int32_t fd, uint32_t events, int32_t operation);
+    void HandleEPOLLERR(int32_t fd, Connection &connection);
+    void HandleAsyncConnectResult(Connection &connection, bool is_success);
 
     uint32_t HandleIOEvent();
     void OnRegisterConnection(const io_event::RegisterConnection &event);
     void OnSendAPacket(io_event::SendAPacket&event);
 
-    void CloseConnection(uint64_t connection_id);
-    void CloseAllConnection();
+    void RemoveConnection(uint64_t connection_id);
+    void RemoveAllConnection();
 
 protected:
     uint16_t m_thread_id;

@@ -47,7 +47,7 @@ public:
 	}
 	virtual void OnAcceptConnection(uint64_t connection_id, const std::string &ip, uint16_t port) override
 	{
-		LOGI("new connection, ip: {}:{}", ip, port);
+		LOGI("new connection{}, ip: {}:{}", connection_id, ip, port);
 		connected_id.emplace(connection_id);
 	}
     virtual void OnReceivePacket(uint64_t conncection_id, NetPacketInterface &packet, uint32_t thread_id) override
@@ -112,7 +112,10 @@ int main(int argc, char *argv[])
 	config.io_thread_num = std::atoi(argv[1]);
 	config.listen_ip = "0.0.0.0";
 	config.listen_port = 18889;
-	net.Init(config, &handler);
+	if (!net.Init(config, &handler))
+	{
+		return -1;
+	}
 	handler.Init(config.io_thread_num, net.GetConfig());
 	if (signal(SIGUSR1, &HandleStopSig) == SIG_ERR)
 	{

@@ -41,8 +41,6 @@ public:
     uint32_t io_thread_sleep_duration = 1000; // 1ms
     //net_manager每一次update处理的io_event数量
     uint32_t net_manager_handle_io_event_num_of_one_update = 100;
-    //监听socket，监听队列的等待数量上限
-    uint32_t listen_queue_max_num = 100;
     //epoll_wait每次处理的事件最大数量
     uint32_t epoll_max_event_num = 50;
 
