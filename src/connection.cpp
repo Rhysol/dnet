@@ -9,7 +9,7 @@
 
 using namespace dnet;
 
-//thread_local ReadBuffer Connection::m_read_buffer;
+thread_local ReadBuffer Connection::m_read_buffer;
 
 Connection::Connection()
 {
@@ -39,7 +39,7 @@ void Connection::Receive()
         read_len = recv(m_fd, m_read_buffer.buffer, ReadBuffer::Capacity(), 0);
         if (read_len > 0)
         {
-            m_read_buffer.size = read_len;
+            m_read_buffer.remain_len = read_len;
             ParseReadBuffer();
         }
         else if (-1 == read_len)
@@ -60,69 +60,48 @@ void Connection::Receive()
 
 void Connection::ParseReadBuffer()
 {
-    if (!m_incomplete_receive)
-    {
-        m_incomplete_receive = CreateReceiveAPacketEvent();
-    }
-    NetPacketInterface *packet = m_incomplete_receive->packet;
-
     uint32_t len_to_read = 0;
-    while (m_read_buffer.offset != m_read_buffer.size)
-    {
-        UpdatePacketDataCapacity(packet, m_read_buffer.buffer + m_read_buffer.offset, m_read_buffer.size - m_read_buffer.offset);
-        len_to_read = std::min<uint32_t>(packet->data_capacity - packet->data_size, m_read_buffer.size - m_read_buffer.offset);
-        memcpy(packet->data + packet->data_size, m_read_buffer.buffer, len_to_read);
-        packet->data_size += len_to_read;
+    do {
+        std::vector<char> &packet_bytes = GetInCompletePacketBytes();
+        len_to_read = std::min<uint32_t>(m_read_buffer.remain_len, packet_bytes.capacity() - m_received_len);
+        memcpy(packet_bytes.data() + m_received_len, m_read_buffer.buffer + m_read_buffer.offset, len_to_read);
+        m_read_buffer.remain_len -= len_to_read;
         m_read_buffer.offset += len_to_read;
-        if (packet->data_capacity_adjusted_success &&
-            packet->data_size == packet->data_capacity)
+        m_received_len += len_to_read;
+        
+        if (m_received_len == packet_bytes.capacity())
         {
             Pass2MainThread(m_incomplete_receive);
-            m_incomplete_receive = CreateReceiveAPacketEvent();
-            packet = m_incomplete_receive->packet;
+            m_incomplete_receive = nullptr;
+            m_received_len = 0;
         }
-    }
+    } while (m_read_buffer.remain_len != 0);
     m_read_buffer.offset = 0;
 }
 
-void Connection::UpdatePacketDataCapacity(NetPacketInterface *packet, const char *bytes, uint32_t bytes_len)
+std::vector<char> &Connection::GetInCompletePacketBytes()
 {
-    if (packet->data == nullptr)
+    uint32_t header_len = m_net_config->packet_header_len;
+    uint32_t packet_len = 0;
+    if (nullptr == m_incomplete_receive)
     {
-        if (bytes_len < packet->header_len)
+        packet_len = header_len;
+        if (m_read_buffer.remain_len >= header_len)
         {
-            packet->data_capacity = packet->header_len;
+            packet_len += m_net_config->get_body_len(m_read_buffer.buffer + m_read_buffer.offset);
         }
-        else
-        {
-            packet->data_capacity = packet->header_len + packet->ParseBodyLenFromHeader(bytes);
-            packet->data_capacity_adjusted_success = true;
-        }
-        packet->data = new char[packet->data_capacity];
+        m_incomplete_receive = new io_event::ReceiveAPacket(packet_len);
+        m_incomplete_receive->connection_id = m_id;
     }
-    else
+    else if (m_received_len < header_len && m_received_len + m_read_buffer.remain_len >= header_len)
     {
-        if (!packet->data_capacity_adjusted_success &&
-            packet->data_size + bytes_len >= packet->header_len)
-        {
-            memcpy(packet->data + packet->data_size, bytes, packet->header_len - packet->data_size);
-            uint32_t body_len = packet->ParseBodyLenFromHeader(packet->data);
-            char *temp = new char[packet->header_len + body_len];
-            memcpy(temp, packet->data, packet->data_size);
-            delete[] packet->data;
-            packet->data = temp;
-            packet->data_capacity = packet->header_len + body_len;
-            packet->data_capacity_adjusted_success = true;
-        }
+        memcpy(m_incomplete_receive->packet_bytes.data() + m_received_len, 
+            m_read_buffer.buffer + m_read_buffer.offset, 
+            header_len - m_received_len);
+        packet_len = header_len + m_net_config->get_body_len(m_incomplete_receive->packet_bytes.data());
+        m_incomplete_receive->packet_bytes.resize(packet_len);
     }
-}
-
-io_event::ReceiveAPacket *Connection::CreateReceiveAPacketEvent()
-{
-    io_event::ReceiveAPacket *event = new io_event::ReceiveAPacket();
-    event->packet = m_net_config->create_net_packet_func();
-    event->connection_id = m_id;
-    return event;
+    return m_incomplete_receive->packet_bytes;
 }
 
 void Connection::OnUnexpectedDisconnect()
@@ -166,8 +145,8 @@ void Connection::DoSendRemainPacket()
     while (m_packet_to_send.size() != 0)
     {
         packet_bytes = &m_packet_to_send.front();
-        bytes_to_write = packet_bytes->data() + m_packet_offset;
-        len_to_write = packet_bytes->size() - m_packet_offset;
+        bytes_to_write = packet_bytes->data() + m_send_offset;
+        len_to_write = packet_bytes->size() - m_send_offset;
         write_len = send(m_fd, bytes_to_write, len_to_write, MSG_NOSIGNAL);
         if (write_len == -1)
         {
@@ -181,11 +160,11 @@ void Connection::DoSendRemainPacket()
         else if (len_to_write == write_len)
         {
             m_packet_to_send.pop_front();
-            m_packet_offset = 0;
+            m_send_offset = 0;
         }
         else
         {
-            m_packet_offset += write_len;
+            m_send_offset += write_len;
         }
     }
 }

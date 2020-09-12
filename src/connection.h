@@ -18,8 +18,8 @@ struct ReadBuffer
         return 65535;
     }
     char buffer[65535];
-    int32_t size = 0;
-    int32_t offset = 0;
+    uint32_t remain_len = 0;
+    uint32_t offset = 0;
 };
 
 class Connection : public IOEventPasser
@@ -46,8 +46,7 @@ public:
     void OnUnexpectedDisconnect();
 private:
     void ParseReadBuffer();
-    void UpdatePacketDataCapacity(NetPacketInterface *packet, const char *bytes, uint32_t bytes_len);
-    io_event::ReceiveAPacket *CreateReceiveAPacketEvent();
+    std::vector<char> &GetInCompletePacketBytes();
 
     void DoSendRemainPacket();
 
@@ -59,12 +58,13 @@ private:
     bool m_to_close = false;
     const NetConfig *m_net_config = nullptr;
 
-    //thread_local static ReadBuffer m_read_buffer;
-    ReadBuffer m_read_buffer;
+    thread_local static ReadBuffer m_read_buffer;
+    //ReadBuffer m_read_buffer;
     io_event::ReceiveAPacket *m_incomplete_receive = nullptr;
+    uint32_t m_received_len = 0;
 
     bool m_can_send = true;
-    uint32_t m_packet_offset = 0;
+    uint32_t m_send_offset = 0;
     std::deque<std::vector<char>> m_packet_to_send;
 };
 

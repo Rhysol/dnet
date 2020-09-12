@@ -73,14 +73,8 @@ struct RegisterConnection : public IOEvent
 
 struct ReceiveAPacket : public IOEvent
 {
-    ReceiveAPacket() : IOEvent(RECEIVE_A_PACKET) {}
-    ~ReceiveAPacket() {
-        if (packet != nullptr)
-        {
-            delete packet;
-        }
-    }
-    NetPacketInterface *packet = nullptr;
+    ReceiveAPacket(uint32_t packet_len) : IOEvent(RECEIVE_A_PACKET), packet_bytes(packet_len) {}
+    std::vector<char> packet_bytes;
 }; 
 
 

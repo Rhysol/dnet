@@ -27,6 +27,7 @@ public:
     uint16_t listen_port = 18889;
     std::string logger_name = "net_logger";
     std::string log_path = "log/net.log";
+    uint32_t packet_header_len = 0;
 
     //****************************************************************//
     //**************************非必要配置 ****************************//
@@ -45,8 +46,8 @@ public:
     uint32_t epoll_max_event_num = 50;
 
     std::shared_ptr<spdlog::logger> logger;
-    typedef std::function<NetPacketInterface * ()> CreateNetPacketFunc;
-    CreateNetPacketFunc create_net_packet_func;
+    typedef std::function<uint32_t (const char *)> GetBodyLen;
+    GetBodyLen get_body_len;
 };
 
 extern uint64_t g_dnet_time_ms;

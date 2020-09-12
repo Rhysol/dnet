@@ -30,14 +30,14 @@ NetManager::~NetManager()
     delete m_net_config;
 }
 
-bool NetManager::Init(const NetConfig &config, NetEventInterface *net_hander)
+bool NetManager::Init(const NetConfig &config, NetEventHandler *net_hander)
 {
     if (net_hander == nullptr) return false;
     g_dnet_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     m_net_event_handler = net_hander;
     m_net_config = new NetConfig(config);
     m_net_config->logger = spdlog::hourly_logger_mt<spdlog::async_factory>(m_net_config->logger_name, m_net_config->log_path);
-    m_net_config->create_net_packet_func = std::bind(&NetEventInterface::CreateNetPacket, m_net_event_handler);
+    m_net_config->get_body_len = std::bind(&NetEventHandler::GetBodyLenFromHeader, m_net_event_handler, std::placeholders::_1);
     m_events_queue.Init(m_net_config->io_thread_num);
     if(!InitThreads())
     {
@@ -129,9 +129,9 @@ void NetManager::OnAcceptConnection(const io_event::AcceptConnection &event)
     m_net_event_handler->OnAcceptConnection(connection_id, event.remote_ip, event.remote_port);
 }
 
-void NetManager::OnReceiveAPacket(const io_event::ReceiveAPacket &event)
+void NetManager::OnReceiveAPacket(io_event::ReceiveAPacket &event)
 {
-    m_net_event_handler->OnReceivePacket(event.connection_id, *event.packet, event.source_thread_id);
+    m_net_event_handler->OnReceivePacket(event.connection_id, event.packet_bytes, event.source_thread_id);
 }
 
 void NetManager::OnDisconnect(uint64_t connection_id)

@@ -18,22 +18,10 @@ void WaitAWhile()
 	nanosleep(&t, NULL);
 }
 
-class NetPacket : public NetPacketInterface
-{
-public:
-	NetPacket(uint32_t header_len) : NetPacketInterface(header_len)
-	{
-
-	}
-    uint32_t ParseBodyLenFromHeader(const char *) override {
-		return 512;
-	}
-};
-
 NetManager net;
 
 std::set<uint64_t> connected_id;
-class NetHandler : public NetEventInterface
+class NetHandler : public NetEventHandler
 {
 public:
 	void Init(uint32_t thread_num, NetConfig *config)
@@ -41,23 +29,23 @@ public:
 		m_count.resize(thread_num);
 		m_net_config = config;
 	}
-    virtual NetPacketInterface *CreateNetPacket() override
+	virtual uint32_t GetBodyLenFromHeader(const char *) override
 	{
-		return new NetPacket(512);
+		return 512;
 	}
 	virtual void OnAcceptConnection(uint64_t connection_id, const std::string &ip, uint16_t port) override
 	{
 		LOGI("new connection{}, ip: {}:{}", connection_id, ip, port);
 		connected_id.emplace(connection_id);
 	}
-    virtual void OnReceivePacket(uint64_t conncection_id, NetPacketInterface &packet, uint32_t thread_id) override
+    virtual void OnReceivePacket(uint64_t conncection_id, std::vector<char> &packet, uint32_t thread_id) override
 	{
-		net.Send(conncection_id, packet.data, packet.data_size);
-		if (m_start_time == std::chrono::system_clock::time_point::min() && strncmp(packet.data, "start", 5))
+		net.Send(conncection_id, packet.data(), packet.size());
+		if (m_start_time == std::chrono::system_clock::time_point::min() && strncmp(packet.data(), "start", 5))
 		{
 			m_start_time = GetNowTime();
 		}
-		else if (m_end_time < GetNowTime() && strncmp(packet.data, "end", 3))
+		else if (m_end_time < GetNowTime() && strncmp(packet.data(), "end", 3))
 		{
 			m_end_time = GetNowTime();
 		}
@@ -112,6 +100,7 @@ int main(int argc, char *argv[])
 	config.io_thread_num = std::atoi(argv[1]);
 	config.listen_ip = "0.0.0.0";
 	config.listen_port = 18889;
+	config.packet_header_len = 512;
 	if (!net.Init(config, &handler))
 	{
 		return -1;

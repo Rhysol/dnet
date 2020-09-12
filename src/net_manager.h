@@ -18,7 +18,7 @@ public:
     NetManager();
     ~NetManager();
 
-    bool Init(const NetConfig &config, NetEventInterface *net_event_handler);
+    bool Init(const NetConfig &config, NetEventHandler *net_event_handler);
     uint32_t Update();
     void Stop();
     inline bool IsAlive() { return m_keep_alive; }
@@ -40,7 +40,7 @@ private:
 
     void OnAcceptConnection(const io_event::AcceptConnection &event);
     inline uint64_t AllocateConnectionId() { return m_next_connection_id++; }
-    void OnReceiveAPacket(const io_event::ReceiveAPacket &event);
+    void OnReceiveAPacket(io_event::ReceiveAPacket &event);
     void OnDisconnect(uint64_t connection_id);
     void OnAsyncConnectResult(const io_event::AsyncConnectResult &event);
 private:
@@ -51,7 +51,7 @@ private:
 
     MPSCQueue<io_event::IOEvent> m_events_queue;
 
-    NetEventInterface *m_net_event_handler = nullptr;
+    NetEventHandler *m_net_event_handler = nullptr;
 
     bool m_keep_alive = true;
 };

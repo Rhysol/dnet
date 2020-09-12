@@ -21,21 +21,9 @@ uint64_t GetNowMs()
 	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
-class NetPacket : public NetPacketInterface
-{
-public:
-	NetPacket(uint32_t header_len) : NetPacketInterface(header_len)
-	{
-
-	}
-    uint32_t ParseBodyLenFromHeader(const char *) override {
-		return 512;
-	}
-};
-
 thread_local std::unordered_map<uint64_t, uint64_t> cost_time;
 
-class NetHandler : public NetEventInterface
+class NetHandler : public NetEventHandler
 {
 public:
 	void Init(NetManager *net_mgr, NetConfig *config)
@@ -43,9 +31,9 @@ public:
 		m_net_mgr = net_mgr;
 		m_net_config = config;
 	}
-    virtual NetPacketInterface *CreateNetPacket() override
+	virtual uint32_t GetBodyLenFromHeader(const char *) override
 	{
-		return new NetPacket(512);
+		return 512;
 	}
 	virtual void OnAcceptConnection(uint64_t, const std::string &, uint16_t) override
 	{
@@ -75,7 +63,7 @@ public:
             LOGI("async connection: {} failed", connection_id);
 		}
 	}
-	virtual void OnReceivePacket(uint64_t connection_id, NetPacketInterface &, uint32_t) override
+	virtual void OnReceivePacket(uint64_t connection_id, std::vector<char> &, uint32_t) override
 	{
         ++m_count;
 		if (GetNowMs() - cost_time[connection_id] <= 3000)
@@ -115,6 +103,7 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path = "log/client_thread_";
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
+	config.packet_header_len = 512;
 	if (!net.Init(config, &handler))
 	{
 		return;

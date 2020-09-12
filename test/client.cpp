@@ -15,33 +15,21 @@ void WaitAWhile()
 	nanosleep(&t, NULL);
 }
 
-class NetPacket : public NetPacketInterface
-{
-public:
-	NetPacket(uint32_t header_len) : NetPacketInterface(header_len)
-	{
-
-	}
-    uint32_t ParseBodyLenFromHeader(const char *) override {
-		return 512;
-	}
-};
-
-class NetHandler : public NetEventInterface
+class NetHandler : public NetEventHandler
 {
 public:
 	void Init(NetConfig *config)
 	{
 		m_net_config = config;
 	}
-    virtual NetPacketInterface *CreateNetPacket() override
+	virtual uint32_t GetBodyLenFromHeader(const char *) override
 	{
-		return new NetPacket(512);
+		return 512;
 	}
 	virtual void OnAcceptConnection(uint64_t, const std::string &, uint16_t) override
 	{
 	}
-	virtual void OnReceivePacket(uint64_t, NetPacketInterface &, uint32_t) override
+	virtual void OnReceivePacket(uint64_t, std::vector<char> &, uint32_t) override
 	{
 		++m_count;
 	}
@@ -68,6 +56,7 @@ void thread_func(uint32_t thread_id, uint32_t total_send_num)
 	config.log_path = "log/client_thread_";
 	config.log_path.append(std::to_string(thread_id));
 	config.log_path.append(".log");
+	config.packet_header_len = 512;
 	if (!net.Init(config, &handler)) return;
 	handler.Init(net.GetConfig());
 	NetConfig *m_net_config = net.GetConfig();
