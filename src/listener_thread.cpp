@@ -68,7 +68,7 @@ bool ListenerThread::StartListen()
 		LOGE("bind listener fd failed, errno: {}", errno);
 		return false;
 	}
-	if (listen(m_listener_fd, SOMAXCONN) == -1)
+	if (listen(m_listener_fd, m_net_config->listener_queue_max_num) == -1)
 	{
 		LOGE("listen failed!, errno: {}", errno);
 		return false;

@@ -1,6 +1,7 @@
 #include "io_thread.h"
 #include <thread>
 #include "logger.h"
+#include <sys/socket.h>
 
 using namespace dnet;
 
@@ -118,6 +119,16 @@ void IOThread::HandleEpollEvent(const epoll_event &ev)
 
 void IOThread::HandleEPOLLERR(int32_t fd, Connection &connection)
 {
+    int error = 0;
+    socklen_t len = sizeof(error);
+    if (getsockopt(fd, SOL_SOCKET, SO_ERROR, (void *)&error, &len) == 0)
+    {
+        LOGE("on epoll err, fd {}, error {}, error_str: {}, connected {}", fd, error, strerror(error), connection.Connected());
+    }
+    else
+    {
+        LOGE("on epoll err, fd {},connected {}", fd, connection.Connected());
+    }
     if (connection.Connected())
     {
         connection.OnUnexpectedDisconnect();
@@ -126,7 +137,6 @@ void IOThread::HandleEPOLLERR(int32_t fd, Connection &connection)
     {
         HandleAsyncConnectResult(connection, false);
     }
-    LOGE("on epoll err, fd {}, errno {}, connected {}", fd, errno, connection.Connected());
 }
 
 void IOThread::HandleAsyncConnectResult(Connection &connection, bool is_success)
