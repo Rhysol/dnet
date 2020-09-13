@@ -100,26 +100,32 @@ void ListenerThread::OnAccept()
 		LOGW("accept client failed! errno: {}", errno);
 		return;
 	}
+	bool result = true;
+	int32_t reuse_addr = 1;
+	//int32_t nodelay = 1;
 	linger linger_val;
 	linger_val.l_onoff = 1;
 	linger_val.l_linger = 0;
 	if (setsockopt(client_fd, SOL_SOCKET, SO_LINGER, (void *)&linger_val, sizeof(linger)) == -1)
 	{
 		LOGE("set client_fd linger failed, errno: {}", errno);
-		return;
+		result = false;
 	}
-	int32_t reuse_addr = 1;
-	if (setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse_addr, sizeof(int32_t)) == -1)
+	else if (setsockopt(client_fd, SOL_SOCKET, SO_REUSEADDR, (void *)&reuse_addr, sizeof(int32_t)) == -1)
 	{
 		LOGE("set client_fd SO_REUSEADDR failed, errno: {}", errno);
-		return;
+		result = false;
 	}
-	//int32_t nodelay = 1;
-	//if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&nodelay, sizeof(int32_t)) == -1)
+	//else if (setsockopt(client_fd, IPPROTO_TCP, TCP_NODELAY, (void *)&nodelay, sizeof(int32_t)) == -1)
 	//{
 	//	LOGE("set client_fd TCP_NODELAY failed, errno: {}", errno);
-	//	return;
+	//  result = false;
 	//}
+	if (!result)
+	{
+		close(client_fd);
+		return;
+	}
 
     io_event::AcceptConnection *event = new io_event::AcceptConnection; //在net_manager内被删除
     event->connection_fd = client_fd;
