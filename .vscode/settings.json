@@ -1,0 +1,6 @@
+{
+    "cmake.configureOnOpen": false,
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "cmake.parallelJobs": 6,
+    "cmake.buildDirectory": "${workspaceFolder}/build"
+}

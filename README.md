@@ -1,6 +1,6 @@
 # dnet
 
-ÏµÍ³ÍøÂçÅäÖÃ
+ç³»ç»Ÿç½‘ç»œé…ç½®
 ulimit -n 102400
 sysctl net.ipv4.ip_local_port_range="15000 61000"
 sysctl net.ipv4.tcp_fin_timeout=30
